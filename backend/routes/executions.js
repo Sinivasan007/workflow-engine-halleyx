@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const {
   startExecution,
+  approveExecution,
   getAllExecutions,
   getExecutionById,
   cancelExecution,
@@ -16,6 +17,9 @@ router.get('/executions', getAllExecutions);
 
 // GET    /executions/:id                 → Get one with logs
 router.get('/executions/:id', getExecutionById);
+
+// POST   /executions/:id/approve         → Approve paused step
+router.post('/executions/:id/approve', approveExecution);
 
 // POST   /executions/:id/cancel          → Cancel execution
 router.post('/executions/:id/cancel', cancelExecution);

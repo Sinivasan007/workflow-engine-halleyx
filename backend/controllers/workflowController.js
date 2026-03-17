@@ -34,24 +34,33 @@ const createWorkflow = async (req, res) => {
 // GET /workflows  (search + pagination)
 const getAllWorkflows = async (req, res) => {
   try {
-    const { search = '', page = 1, limit = 10 } = req.query;
+    const { search = '', status, page = 1, limit = 10 } = req.query;
     const parsedLimit  = parseInt(limit)  || 10;
     const parsedOffset = (parseInt(page) - 1) * parsedLimit;
+
+    // Build dynamic conditions
+    const conditions = ['(w.name LIKE ? OR w.description LIKE ?)'];
+    const params = [`%${search}%`, `%${search}%`];
+
+    if (status === 'active')   { conditions.push('w.is_active = 1'); }
+    if (status === 'inactive') { conditions.push('w.is_active = 0'); }
+
+    const where = conditions.join(' AND ');
 
     const [rows] = await pool.execute(
       `SELECT w.*, COUNT(DISTINCT s.id) as step_count
        FROM workflows w
        LEFT JOIN steps s ON s.workflow_id = w.id
-       WHERE w.name LIKE ? OR w.description LIKE ?
+       WHERE ${where}
        GROUP BY w.id
        ORDER BY w.created_at DESC
        LIMIT ${parsedLimit} OFFSET ${parsedOffset}`,
-      [`%${search}%`, `%${search}%`]
+      params
     );
 
     const [[{ total }]] = await pool.execute(
-      `SELECT COUNT(*) AS total FROM workflows WHERE name LIKE ? OR description LIKE ?`,
-      [`%${search}%`, `%${search}%`]
+      `SELECT COUNT(*) AS total FROM workflows w WHERE ${where}`,
+      params
     );
 
     res.json({

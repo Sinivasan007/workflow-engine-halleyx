@@ -32,7 +32,7 @@ export default function WorkflowEditor() {
   const [workflow, setWorkflow] = useState({
     name: '',
     description: '',
-    status: 'active',
+    is_active: true,
     start_step_id: null,
     input_schema: [],
     steps: []
@@ -252,7 +252,7 @@ export default function WorkflowEditor() {
     const payload = {
       name: workflow.name,
       description: workflow.description,
-      status: workflow.status,
+      is_active: workflow.is_active,
       start_step_id: workflow.start_step_id || null,
       input_schema: buildSchemaObject(schemaFields)
     };
@@ -337,10 +337,10 @@ export default function WorkflowEditor() {
                     <p className="text-gray-500">Active workflows can be executed by users</p>
                   </div>
                   <button 
-                    onClick={() => { setWorkflow({...workflow, status: workflow.status === 'active' ? 'inactive' : 'active'}); setIsDirty(true); }}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${workflow.status === 'active' ? 'bg-indigo-600' : 'bg-gray-200'}`}
+                    onClick={() => { setWorkflow({...workflow, is_active: !workflow.is_active}); setIsDirty(true); }}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${workflow.is_active ? 'bg-indigo-600' : 'bg-gray-200'}`}
                   >
-                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${workflow.status === 'active' ? 'translate-x-6' : 'translate-x-1'}`} />
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${workflow.is_active ? 'translate-x-6' : 'translate-x-1'}`} />
                   </button>
                 </div>
               </div>

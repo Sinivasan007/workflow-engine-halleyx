@@ -76,8 +76,8 @@ export default function WorkflowList() {
 
       const list = data.data || data.workflows || data || [];
       setWorkflows(Array.isArray(list) ? list : []);
-      setTotalPages(data.totalPages || data.total_pages || 1);
-      setTotalCount(data.total || (Array.isArray(list) ? list.length : 0));
+      setTotalPages(data.pagination?.totalPages || data.totalPages || 1);
+      setTotalCount(data.pagination?.total || data.total || (Array.isArray(list) ? list.length : 0));
     } catch (err) {
       showToast('Failed to load workflows', 'error');
     } finally {
@@ -235,7 +235,7 @@ export default function WorkflowList() {
                     v{wf.version || 1}
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <StatusBadge status={wf.status || 'active'} size="sm" />
+                    <StatusBadge status={wf.is_active ? 'active' : 'inactive'} size="sm" />
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">
                     {fmt(wf.created_at)}

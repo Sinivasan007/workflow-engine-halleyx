@@ -39,9 +39,12 @@ const getAllWorkflows = async (req, res) => {
     const parsedOffset = (parseInt(page) - 1) * parsedLimit;
 
     const [rows] = await pool.execute(
-      `SELECT * FROM workflows
-       WHERE name LIKE ? OR description LIKE ?
-       ORDER BY created_at DESC
+      `SELECT w.*, COUNT(DISTINCT s.id) as step_count
+       FROM workflows w
+       LEFT JOIN steps s ON s.workflow_id = w.id
+       WHERE w.name LIKE ? OR w.description LIKE ?
+       GROUP BY w.id
+       ORDER BY w.created_at DESC
        LIMIT ${parsedLimit} OFFSET ${parsedOffset}`,
       [`%${search}%`, `%${search}%`]
     );

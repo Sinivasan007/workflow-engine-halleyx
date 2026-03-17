@@ -45,11 +45,11 @@ export default function AuditLog() {
       const { data } = await getExecutions(params);
       const list = data.data || data.executions || data || [];
       setExecutions(list);
-      setTotalPages(data.totalPages || 1);
+      setTotalPages(data.pagination?.totalPages || 1);
       
-      // Compute simple stats for current view / or ideally from backend
+      // Compute stats — use backend total for 'total' count
       if (Array.isArray(list)) {
-        const s = { total: list.length, completed: 0, failed: 0, in_progress: 0 };
+        const s = { total: data.pagination?.total || list.length, completed: 0, failed: 0, in_progress: 0 };
         list.forEach(ex => {
           if (ex.status === 'completed') s.completed++;
           else if (ex.status === 'failed') s.failed++;

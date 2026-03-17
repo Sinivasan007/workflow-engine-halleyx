@@ -10,7 +10,7 @@ import StatusBadge from '../components/StatusBadge';
 import { useToast } from '../components/Toast';
 import { 
   getWorkflow, executeWorkflow, getExecution, 
-  approveExecution, cancelExecution
+  approveExecution, cancelExecution, retryExecution
 } from '../services/api';
 
 /* ── helpers ───────────────────────────────────────────────────────────── */
@@ -59,11 +59,13 @@ export default function ExecutionView() {
       // Initialize input data default values
       const schema = typeof data.input_schema === 'string' ? JSON.parse(data.input_schema) : data.input_schema;
       const initial = {};
-      schema?.forEach(f => {
-        if (f.type === 'boolean') initial[f.name] = false;
-        else if (f.type === 'number') initial[f.name] = '';
-        else initial[f.name] = '';
-      });
+      if (schema && typeof schema === 'object') {
+        Object.entries(schema).forEach(([fieldName, fieldConfig]) => {
+          if (fieldConfig.type === 'boolean') initial[fieldName] = false;
+          else if (fieldConfig.type === 'number') initial[fieldName] = '';
+          else initial[fieldName] = '';
+        });
+      }
       setInputData(initial);
     } catch { showToast('Failed to load workflow', 'error'); }
   }, [showToast]);
@@ -83,7 +85,7 @@ export default function ExecutionView() {
     } catch { showToast('Failed to load execution', 'error'); }
     finally { setLoading(false); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workflow, loadWorkflow, showToast]);
+  }, [workflow?.id, loadWorkflow, showToast]);
 
   useEffect(() => {
     // If URL is /executions/:id, we load execution. If /workflows/:id/execute, we load workflow.
@@ -95,7 +97,8 @@ export default function ExecutionView() {
       setLoading(false);
     }
     return () => stopPolling();
-  }, [id, loadExecution, loadWorkflow]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
 
   /* ── Polling Logic ──────────────────────────────────────────────────── */
   const startPolling = (eid) => {
@@ -126,12 +129,16 @@ export default function ExecutionView() {
   /* ── Actions ────────────────────────────────────────────────────────── */
   const handleStart = async () => {
     if (!workflow) return;
-    const schema = typeof workflow?.input_schema === 'string' ? JSON.parse(workflow.input_schema) : (workflow?.input_schema || []);
-    // Basic validation
-    for (const f of schema) {
-      if (f.required && !inputData[f.name]) {
-        return showToast(`${f.name} is required`, 'error');
+    const rawSchema = typeof workflow?.input_schema === 'string' ? JSON.parse(workflow.input_schema) : (workflow?.input_schema || {});
+    // Validate required fields using Object.entries (schema is an object, not an array)
+    const missingFields = [];
+    Object.entries(rawSchema).forEach(([fieldName, fieldConfig]) => {
+      if (fieldConfig.required && !inputData[fieldName] && inputData[fieldName] !== 0) {
+        missingFields.push(fieldName);
       }
+    });
+    if (missingFields.length > 0) {
+      return showToast(`Required fields missing: ${missingFields.join(', ')}`, 'error');
     }
 
     setIsStarting(true);
@@ -183,19 +190,38 @@ export default function ExecutionView() {
   const handleRetry = async () => {
     if (!execution?.id) return;
     try {
-      await executeWorkflow(workflow.id, { input_data: execution.input_data, triggered_by: triggeredBy });
+      const res = await retryExecution(execution.id);
       showToast('Retry started', 'success');
-      navigate('/audit');
+      setExecution(res.data);
+      // Resume polling in case it continues
+      if (res.data?.status === 'in_progress') {
+        startPolling(execution.id);
+      }
     } catch (err) {
       showToast(err.response?.data?.error || 'Retry failed', 'error');
     }
+  };
+
+  const handleExecuteAgain = () => {
+    stopPolling();
+    setExecution(null);
+    setInputData({});
+    setTriggeredBy('');
+    // Re-load the workflow to get fresh schema for input form
+    loadWorkflow(id);
+    navigate(`/workflows/${id}/execute`, { replace: true });
   };
 
   /* ── Renderers ──────────────────────────────────────────────────────── */
   const renderInputForm = () => {
     if (!workflow) return null;
     const rawSchema = workflow?.input_schema;
-    const schema = typeof rawSchema === 'string' ? JSON.parse(rawSchema) : (rawSchema || []);
+    const schemaObj = typeof rawSchema === 'string' ? JSON.parse(rawSchema) : (rawSchema || {});
+    
+    // input_schema is a JSON object { fieldName: { type, required, allowed_values } }
+    // Convert to array of entries for rendering
+    const schemaEntries = Object.entries(schemaObj);
+
     return (
       <div className="max-w-2xl mx-auto space-y-6 animate-fadeIn">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
@@ -203,40 +229,54 @@ export default function ExecutionView() {
           <p className="text-sm text-gray-500 mb-6">Provide the required fields to trigger the workflow engine.</p>
           
           <div className="space-y-5">
-            {schema.map((field, idx) => (
-              <div key={idx}>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  {field.name} {field.required && <span className="text-red-500">*</span>}
-                </label>
-                {field.allowed_values ? (
-                  <select 
-                    value={inputData[field.name]}
-                    onChange={e => setInputData({...inputData, [field.name]: e.target.value})}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500"
-                  >
-                    <option value="">Select an option...</option>
-                    {field.allowed_values.split(',').map(v => <option key={v} value={v.trim()}>{v.trim()}</option>)}
-                  </select>
-                ) : field.type === 'boolean' ? (
-                  <label className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer">
-                    <input 
-                      type="checkbox" checked={inputData[field.name]}
-                      onChange={e => setInputData({...inputData, [field.name]: e.target.checked})}
-                      className="w-5 h-5 text-indigo-600 rounded"
-                    />
-                    <span className="text-sm text-gray-600">Enable this option</span>
+            {schemaEntries.map(([fieldName, fieldConfig]) => {
+              const isRequired = fieldConfig.required === true;
+              const fieldType = fieldConfig.type;
+              const allowedValues = fieldConfig.allowed_values;
+
+              return (
+                <div key={fieldName}>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">
+                    {fieldName.charAt(0).toUpperCase() + fieldName.slice(1)}
+                    {isRequired && <span className="text-red-500 ml-1">*</span>}
                   </label>
-                ) : (
-                  <input 
-                    type={field.type === 'number' ? 'number' : 'text'}
-                    value={inputData[field.name]}
-                    onChange={e => setInputData({...inputData, [field.name]: e.target.value})}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500"
-                    placeholder={`Enter ${field.name}...`}
-                  />
-                )}
-              </div>
-            ))}
+
+                  {/* Dropdown if allowed_values exist */}
+                  {allowedValues && allowedValues.length > 0 ? (
+                    <select
+                      value={inputData[fieldName] || ''}
+                      onChange={e => setInputData(prev => ({ ...prev, [fieldName]: e.target.value }))}
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    >
+                      <option value="">Select {fieldName}...</option>
+                      {allowedValues.map(val => (
+                        <option key={val} value={val}>{val}</option>
+                      ))}
+                    </select>
+                  ) : fieldType === 'boolean' ? (
+                    <label className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer">
+                      <input 
+                        type="checkbox" checked={inputData[fieldName] || false}
+                        onChange={e => setInputData(prev => ({ ...prev, [fieldName]: e.target.checked }))}
+                        className="w-5 h-5 text-indigo-600 rounded"
+                      />
+                      <span className="text-sm text-gray-600">Enable this option</span>
+                    </label>
+                  ) : (
+                    <input 
+                      type={fieldType === 'number' ? 'number' : 'text'}
+                      value={inputData[fieldName] || ''}
+                      onChange={e => setInputData(prev => ({
+                        ...prev,
+                        [fieldName]: fieldType === 'number' ? (parseFloat(e.target.value) || '') : e.target.value
+                      }))}
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      placeholder={`Enter ${fieldName}...`}
+                    />
+                  )}
+                </div>
+              );
+            })}
 
             <div className="pt-4 border-t border-gray-50">
               <label className="block text-sm font-semibold text-gray-700 mb-1">Triggered By (Username)</label>
@@ -268,10 +308,14 @@ export default function ExecutionView() {
   const renderProgress = () => {
     if (!execution) return null;
     const ex = execution;
-    const logs = ex?.logs || [];
+    // Sort logs by started_at; use original array index as tiebreaker
+    // (auto-complete steps can share the same millisecond timestamp)
+    const sortedLogs = (ex?.logs || [])
+      .map((log, i) => ({ ...log, _idx: i }))
+      .sort((a, b) => new Date(a.started_at) - new Date(b.started_at) || a._idx - b._idx);
     
     // Determine current step index
-    const steps = workflow?.steps?.sort((a,b) => a.order_index - b.order_index) || [];
+    const steps = [...(workflow?.steps || [])].sort((a,b) => a.step_order - b.step_order);
     const currentStepId = ex?.current_step_id;
     
     return (
@@ -304,7 +348,7 @@ export default function ExecutionView() {
             </h3>
             <div className="relative space-y-0.5 ml-2">
               {steps.map((s, i) => {
-                const log = logs.find(l => l.step_id === s.id && l.status !== 'in_progress');
+                const log = sortedLogs.find(l => l.step_id === s.id && l.status !== 'in_progress');
                 const isCurrent = currentStepId === s.id && ex.status === 'in_progress';
                 const isPending = !log && !isCurrent;
                 
@@ -401,8 +445,12 @@ export default function ExecutionView() {
                 <h3 className="text-emerald-700 text-2xl font-bold">Workflow Completed!</h3>
                 <p className="text-emerald-600 mt-2">All steps finished successfully in {fmtDuration(execution.started_at, execution.ended_at)}</p>
                 <div className="mt-6 flex justify-center gap-3">
-                  <button onClick={() => navigate('/audit')} className="bg-white border border-emerald-200 text-emerald-700 font-bold px-6 py-2 rounded-xl hover:bg-emerald-100 transition">View Audit Log</button>
-                  <button onClick={() => navigate(`/workflows/${execution.workflow_id}/execute`)} className="bg-emerald-600 text-white font-bold px-6 py-2 rounded-xl hover:bg-emerald-700 transition">Execute Again</button>
+                  <button onClick={() => navigate('/audit')} className="bg-white border border-emerald-200 text-emerald-700 font-bold px-6 py-2 rounded-xl hover:bg-emerald-100 transition flex items-center gap-2">
+                    📋 View Audit Log
+                  </button>
+                  <button onClick={handleExecuteAgain} className="bg-emerald-600 text-white font-bold px-6 py-2 rounded-xl hover:bg-emerald-700 transition flex items-center gap-2 shadow-lg">
+                    <Play className="w-4 h-4" /> Execute Again
+                  </button>
                 </div>
               </div>
             )}
@@ -412,7 +460,11 @@ export default function ExecutionView() {
                 <div className="text-5xl mb-3">⛔</div>
                 <h3 className="text-gray-700 text-2xl font-bold">Execution Canceled</h3>
                 <p className="text-gray-500 mt-2">This workflow was terminated before completion.</p>
-                <button onClick={() => navigate('/audit')} className="mt-6 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold px-8 py-2 rounded-xl transition">Back to Audit Log</button>
+                <div className="mt-6 flex justify-center gap-3">
+                  <button onClick={handleExecuteAgain} className="bg-indigo-600 text-white font-bold px-6 py-2 rounded-xl hover:bg-indigo-700 transition flex items-center gap-2 shadow-lg">
+                    <Play className="w-4 h-4" /> Execute Again
+                  </button>
+                </div>
               </div>
             )}
 
@@ -422,8 +474,11 @@ export default function ExecutionView() {
                 <h3 className="text-red-700 text-2xl font-bold">Execution Failed</h3>
                 <p className="text-red-600 mt-2 max-w-md mx-auto">{execution.error_message || 'An error occurred during execution.'}</p>
                 <div className="mt-6 flex justify-center gap-3">
-                  <button onClick={handleRetry} className="bg-red-600 hover:bg-red-700 text-white font-bold px-8 py-3 rounded-xl transition flex items-center gap-2 shadow-lg">
-                    <RotateCcw className="w-5 h-5" /> Retry Execution
+                  <button onClick={handleRetry} className="bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-3 rounded-xl transition flex items-center gap-2 shadow-lg">
+                    <RotateCcw className="w-5 h-5" /> Retry Failed Step
+                  </button>
+                  <button onClick={handleExecuteAgain} className="bg-indigo-600 text-white font-bold px-6 py-3 rounded-xl hover:bg-indigo-700 transition flex items-center gap-2 shadow-lg">
+                    <Play className="w-4 h-4" /> Execute Again
                   </button>
                 </div>
               </div>
@@ -433,7 +488,7 @@ export default function ExecutionView() {
             <div className="space-y-4">
               <h3 className="font-bold text-gray-900 ml-1">Execution Logs</h3>
               <div className="space-y-3">
-                {logs.map((log, idx) => (
+                {sortedLogs.map((log, idx) => (
                   <div key={log.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                     <button 
                       onClick={() => toggleLog(log.id)}

@@ -22,6 +22,13 @@ function evaluateCondition(condition, inputData, alreadyMatched = false) {
   try {
     if (!condition || typeof condition !== 'string') return false;
 
+    // ── SAFETY: Ensure inputData is a parsed object, not a JSON string ──
+    let data = inputData;
+    if (typeof data === 'string') {
+      try { data = JSON.parse(data); } catch { data = {}; }
+    }
+    if (!data || typeof data !== 'object') data = {};
+
     const trimmed = condition.trim();
 
     // DEFAULT rule only matches if no previous rule has matched
@@ -35,7 +42,7 @@ function evaluateCondition(condition, inputData, alreadyMatched = false) {
     expr = expr.replace(
       /contains\(\s*(\w+)\s*,\s*(['"])(.*?)\2\s*\)/g,
       (_, field, __, value) => {
-        const actual = inputData[field];
+        const actual = data[field];
         if (actual === undefined || actual === null) return 'false';
         return String(actual).includes(value) ? 'true' : 'false';
       }
@@ -45,7 +52,7 @@ function evaluateCondition(condition, inputData, alreadyMatched = false) {
     expr = expr.replace(
       /startsWith\(\s*(\w+)\s*,\s*(['"])(.*?)\2\s*\)/g,
       (_, field, __, value) => {
-        const actual = inputData[field];
+        const actual = data[field];
         if (actual === undefined || actual === null) return 'false';
         return String(actual).startsWith(value) ? 'true' : 'false';
       }
@@ -55,29 +62,42 @@ function evaluateCondition(condition, inputData, alreadyMatched = false) {
     expr = expr.replace(
       /endsWith\(\s*(\w+)\s*,\s*(['"])(.*?)\2\s*\)/g,
       (_, field, __, value) => {
-        const actual = inputData[field];
+        const actual = data[field];
         if (actual === undefined || actual === null) return 'false';
         return String(actual).endsWith(value) ? 'true' : 'false';
       }
     );
 
     // ── Replace bare field names with their values ──
-    // Match word tokens that are not JS keywords / boolean literals
+    // IMPORTANT: First, strip out quoted string literals so we don't
+    // accidentally replace words inside them (e.g., 'Director' in
+    // role_level == 'Director' is NOT a field name).
     const JS_KEYWORDS = new Set([
       'true', 'false', 'null', 'undefined', 'AND', 'OR',
       'if', 'else', 'return', 'var', 'let', 'const',
     ]);
 
+    // Step A: Extract all quoted strings and replace with placeholders
+    const stringLiterals = [];
+    expr = expr.replace(/(['"])((?:(?!\1).)*)\1/g, (match) => {
+      stringLiterals.push(match);
+      return `__STR_${stringLiterals.length - 1}__`;
+    });
+
+    // Step B: Now safely replace bare field names (no quoted strings left)
     expr = expr.replace(/\b([a-zA-Z_][a-zA-Z0-9_]*)\b/g, (match) => {
       if (JS_KEYWORDS.has(match)) return match;
-      if (match in inputData) {
-        const val = inputData[match];
+      if (match in data) {
+        const val = data[match];
         if (typeof val === 'string') return JSON.stringify(val); // wrap in quotes
         if (val === null || val === undefined) return 'null';
         return String(val); // number / boolean
       }
-      return match; // unknown field → leave as-is (will likely evaluate to undefined → safe)
+      return match; // unknown field → leave as-is
     });
+
+    // Step C: Restore the original quoted strings
+    expr = expr.replace(/__STR_(\d+)__/g, (_, idx) => stringLiterals[parseInt(idx)]);
 
     // ── Safety check: block dangerous patterns ──
     const DANGEROUS = /\b(eval|Function|require|process|global|__dirname|__filename|import|export|fetch|XMLHttpRequest|setTimeout|setInterval)\b/;

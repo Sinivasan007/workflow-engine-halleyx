@@ -54,14 +54,23 @@ export default function RuleEditor() {
   const handleSaveRule = async (e) => {
     e.preventDefault();
     if (!ruleForm.condition_expr) return showToast('Condition is required', 'error');
-    if (!ruleForm.next_step_id) return showToast('Next step selection is required', 'error');
+
+    // Normalize next_step_id: convert 'null', empty string, or '__END__' to actual null
+    const cleanNextStepId = (!ruleForm.next_step_id || ruleForm.next_step_id === 'null' || ruleForm.next_step_id === '__END__')
+      ? null
+      : ruleForm.next_step_id;
+
+    const payload = {
+      ...ruleForm,
+      next_step_id: cleanNextStepId,
+    };
 
     try {
       if (editingRule) {
-        await updateRule(editingRule.id, ruleForm);
+        await updateRule(editingRule.id, payload);
         showToast('Rule updated', 'success');
       } else {
-        await createRule(stepId, ruleForm);
+        await createRule(stepId, payload);
         showToast('Rule added', 'success');
       }
       setEditingRule(null);
@@ -133,11 +142,11 @@ export default function RuleEditor() {
 
         {/* Default Rule Warning */}
         {!hasDefault && (
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-amber-500 mt-0.5" />
+          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-yellow-500 mt-0.5" />
             <div>
-              <h4 className="text-sm font-bold text-amber-800">No DEFAULT rule found!</h4>
-              <p className="text-sm text-amber-700">Add a rule with condition <code className="bg-amber-100 px-1 rounded font-bold">DEFAULT</code> to handle unmatched scenarios and prevent execution failure.</p>
+              <h4 className="text-sm font-bold text-yellow-800">⚠️ No DEFAULT rule found!</h4>
+              <p className="text-sm text-yellow-700">Add a rule with condition <code className="bg-yellow-100 px-1 rounded font-bold">DEFAULT</code> to handle unmatched scenarios and prevent execution failure.</p>
             </div>
           </div>
         )}
@@ -242,7 +251,7 @@ export default function RuleEditor() {
                       {workflow?.steps?.filter(s => s.id !== stepId).map(s => (
                         <option key={s.id} value={s.id}>{s.name}</option>
                       ))}
-                      <option value="null" className="text-gray-400 italic">— End Workflow —</option>
+                      <option value="__END__" className="text-gray-400 italic">— End Workflow —</option>
                     </select>
                   </div>
                 </div>

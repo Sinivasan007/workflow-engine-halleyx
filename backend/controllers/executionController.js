@@ -71,7 +71,9 @@ async function fetchExecutionWithLogs(id) {
 const startExecution = async (req, res) => {
   try {
     const { workflow_id } = req.params;
-    const { triggered_by, ...inputFields } = req.body;
+    const { triggered_by, input_data } = req.body;
+    // input_data is the actual fields object (e.g. { salary: 75000, role_level: 'Director' })
+    const inputFields = input_data || {};
 
     // Load workflow
     const [[workflow]] = await pool.execute(
@@ -186,7 +188,12 @@ const approveExecution = async (req, res) => {
     );
 
     const { evaluateCondition } = require('../services/ruleEngine');
-    const inputData = parseJSON(execution.input_data) || {};
+    // Unwrap input_data: handle both { input_data: {...} } nesting and flat objects
+    let rawInputData = parseJSON(execution.input_data) || {};
+    if (rawInputData.input_data && typeof rawInputData.input_data === 'object') {
+      rawInputData = rawInputData.input_data; // unwrap double-nesting
+    }
+    const inputData = rawInputData;
 
     let matchedRule = null;
     for (const rule of rules) {
@@ -197,7 +204,9 @@ const approveExecution = async (req, res) => {
     }
 
     // Advance current_step_id to the next step (or stay on this one for the engine to complete)
-    const nextStepId = matchedRule ? matchedRule.next_step_id : null;
+    const nextStepId = matchedRule 
+      ? (matchedRule.next_step_id && matchedRule.next_step_id !== 'null' ? matchedRule.next_step_id : null) 
+      : null;
 
     await pool.execute(
       `UPDATE executions SET current_step_id = ? WHERE id = ?`,
@@ -228,7 +237,7 @@ const approveExecution = async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 const getAllExecutions = async (req, res) => {
   try {
-    const { status, workflow_id, page = 1, limit = 10 } = req.query;
+    const { status, workflow_id, search, page = 1, limit = 10 } = req.query;
     const parsedLimit  = parseInt(limit)  || 10;
     const parsedOffset = (parseInt(page) - 1) * parsedLimit;
 
@@ -238,6 +247,7 @@ const getAllExecutions = async (req, res) => {
 
     if (status)      { conditions.push('e.status = ?');      params.push(status); }
     if (workflow_id) { conditions.push('e.workflow_id = ?'); params.push(workflow_id); }
+    if (search)      { conditions.push('w.name LIKE ?');     params.push(`%${search}%`); }
 
     const where = conditions.join(' AND ');
 
@@ -252,7 +262,7 @@ const getAllExecutions = async (req, res) => {
     );
 
     const [[{ total }]] = await pool.execute(
-      `SELECT COUNT(*) AS total FROM executions e WHERE ${where}`,
+      `SELECT COUNT(*) AS total FROM executions e LEFT JOIN workflows w ON w.id = e.workflow_id WHERE ${where}`,
       params
     );
 

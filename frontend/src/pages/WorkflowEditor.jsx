@@ -3,7 +3,7 @@ import { useNavigate, useParams, Link } from 'react-router-dom';
 import { 
   ArrowLeft, Save, Plus, Trash2, Edit2, 
   Settings, Database, List, Eye, Trash,
-  Mail, Bell
+  Mail, Bell, Play, CheckCircle2
 } from 'lucide-react';
 import Layout from '../components/Layout';
 import Modal from '../components/Modal';
@@ -33,19 +33,29 @@ export default function WorkflowEditor() {
     name: '',
     description: '',
     status: 'active',
+    start_step_id: null,
     input_schema: [],
     steps: []
   });
 
   // Step Modal State
-  const [isStepModalOpen, setIsStepModalOpen] = useState(false);
-  const [editingStep, setEditingStep] = useState(null);
-  const [stepForm, setStepForm] = useState({
+  const initialStepForm = {
     name: '',
     step_type: 'task',
-    order_index: 0,
-    metadata: {}
-  });
+    step_order: 1,
+    metadata: {
+      assignee_email: '',
+      instructions: '',
+      channel: 'email',
+      to: '',
+      template: '',
+      action: '',
+      description: ''
+    }
+  };
+  const [isStepModalOpen, setIsStepModalOpen] = useState(false);
+  const [editingStep, setEditingStep] = useState(null);
+  const [stepForm, setStepForm] = useState(initialStepForm);
 
   // Input Schema State (Array for UI)
   const [schemaFields, setSchemaFields] = useState([]);
@@ -82,16 +92,28 @@ export default function WorkflowEditor() {
   };
 
   /* ── Load Data ───────────────────────────────────────────────────────── */
+  const loadWorkflow = async () => {
+    try {
+      const { data } = await getWorkflow(id);
+      setWorkflow(prev => ({
+        ...prev,
+        ...data,
+        steps: [...(data.steps || [])].sort((a, b) => a.step_order - b.step_order)
+      }));
+      const schema = typeof data.input_schema === 'string' ? JSON.parse(data.input_schema) : (data.input_schema || {});
+      setSchemaFields(loadSchemaToArray(schema));
+    } catch (err) {
+      console.error('Failed to load workflow', err);
+      showToast('Failed to load workflow', 'error');
+    }
+  };
+
   useEffect(() => {
     if (isEdit) {
       const load = async () => {
         try {
-          const { data } = await getWorkflow(id);
-          setWorkflow(data);
-          const schema = typeof data.input_schema === 'string' ? JSON.parse(data.input_schema) : (data.input_schema || {});
-          setSchemaFields(loadSchemaToArray(schema));
+          await loadWorkflow();
         } catch {
-          showToast('Failed to load workflow', 'error');
           navigate('/workflows');
         } finally {
           setLoading(false);
@@ -99,7 +121,8 @@ export default function WorkflowEditor() {
       };
       load();
     }
-  }, [id, isEdit, navigate, showToast]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, isEdit]);
 
   /* ── Input Schema Management ─────────────────────────────────────────── */
   const addSchemaField = () => {
@@ -118,56 +141,94 @@ export default function WorkflowEditor() {
   };
 
   /* ── Step Management ─────────────────────────────────────────────────── */
+  const buildMetadata = () => {
+    switch (stepForm.step_type) {
+      case 'approval':
+        return {
+          assignee_email: stepForm.metadata.assignee_email || '',
+          instructions: stepForm.metadata.instructions || ''
+        };
+      case 'notification':
+        return {
+          channel: stepForm.metadata.channel || 'email',
+          to: stepForm.metadata.to || '',
+          template: stepForm.metadata.template || ''
+        };
+      case 'task':
+        return {
+          action: stepForm.metadata.action || '',
+          description: stepForm.metadata.description || ''
+        };
+      default:
+        return {};
+    }
+  };
+
+  const handleCloseModal = () => {
+    setIsStepModalOpen(false);
+    setEditingStep(null);
+    setStepForm(initialStepForm);
+  };
+
   const openAddStep = () => {
     setEditingStep(null);
     setStepForm({
-      name: '',
-      step_type: 'task',
-      order_index: workflow.steps.length + 1,
-      metadata: {}
+      ...initialStepForm,
+      step_order: (workflow.steps?.length || 0) + 1
     });
     setIsStepModalOpen(true);
   };
 
   const openEditStep = (step) => {
+    const parsedMetadata = typeof step.metadata === 'string'
+      ? JSON.parse(step.metadata)
+      : (step.metadata || {});
     setEditingStep(step);
     setStepForm({
-      name: step.name,
-      step_type: step.step_type,
-      order_index: step.order_index,
-      metadata: typeof step.metadata === 'string' ? JSON.parse(step.metadata) : (step.metadata || {})
+      name: step.name || '',
+      step_type: step.step_type || 'task',
+      step_order: step.step_order || 1,
+      metadata: {
+        assignee_email: parsedMetadata.assignee_email || '',
+        instructions: parsedMetadata.instructions || '',
+        channel: parsedMetadata.channel || 'email',
+        to: parsedMetadata.to || '',
+        template: parsedMetadata.template || '',
+        action: parsedMetadata.action || '',
+        description: parsedMetadata.description || ''
+      }
     });
     setIsStepModalOpen(true);
   };
 
   const saveStep = async () => {
     if (!stepForm.name) return showToast('Step name is required', 'error');
-    
+
+    const payload = {
+      name: stepForm.name,
+      step_type: stepForm.step_type,
+      step_order: stepForm.step_order,
+      metadata: buildMetadata()
+    };
+
     try {
       if (editingStep) {
-        await updateStep(editingStep.id, stepForm);
+        await updateStep(editingStep.id, payload);
         showToast('Step updated', 'success');
       } else {
         if (!isEdit) {
-          // If creating a new workflow, we handle steps locally until workflow is saved? 
-          // Requirement says "Auto-save steps immediately (POST to API on Add)".
-          // This implies we need a workflow ID. Let's force save workflow first if it's new.
           if (!workflow.name) return showToast('Please name the workflow first', 'error');
           const { data } = await createWorkflow({ ...workflow, input_schema: JSON.stringify(workflow.input_schema) });
           setWorkflow(prev => ({ ...prev, id: data.id }));
           navigate(`/workflows/${data.id}/edit`, { replace: true });
-          await createStep(data.id, stepForm);
+          await createStep(data.id, payload);
         } else {
-          await createStep(id, stepForm);
+          await createStep(id, payload);
         }
         showToast('Step added', 'success');
       }
-      setIsStepModalOpen(false);
-      // Refresh workflow data
-      const { data } = await getWorkflow(id || workflow.id);
-      setWorkflow(data);
-      const schema = typeof data.input_schema === 'string' ? JSON.parse(data.input_schema) : (data.input_schema || {});
-      setSchemaFields(loadSchemaToArray(schema));
+      handleCloseModal();
+      await loadWorkflow();
     } catch {
       showToast('Failed to save step', 'error');
     }
@@ -178,10 +239,7 @@ export default function WorkflowEditor() {
     try {
       await deleteStep(stepId);
       showToast('Step deleted', 'success');
-      const { data } = await getWorkflow(id);
-      setWorkflow(data);
-      const schema = typeof data.input_schema === 'string' ? JSON.parse(data.input_schema) : (data.input_schema || {});
-      setSchemaFields(loadSchemaToArray(schema));
+      await loadWorkflow();
     } catch {
       showToast('Failed to delete step', 'error');
     }
@@ -195,6 +253,7 @@ export default function WorkflowEditor() {
       name: workflow.name,
       description: workflow.description,
       status: workflow.status,
+      start_step_id: workflow.start_step_id || null,
       input_schema: buildSchemaObject(schemaFields)
     };
     
@@ -286,6 +345,47 @@ export default function WorkflowEditor() {
                 </div>
               </div>
             </div>
+
+            {/* Section 1.5: Start Step */}
+            {isEdit && (
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                <div className="flex items-center gap-2 mb-4 text-gray-900 font-bold">
+                  <Play className="w-5 h-5 text-indigo-600" />
+                  <h3>Start Step</h3>
+                </div>
+                <p className="text-sm text-gray-500 mb-4">Select which step the workflow should begin with when executed.</p>
+                {workflow.steps?.length > 0 ? (
+                  <div className="space-y-3">
+                    <select
+                      value={workflow.start_step_id || ''}
+                      onChange={e => { setWorkflow({...workflow, start_step_id: e.target.value || null}); setIsDirty(true); }}
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+                    >
+                      <option value="">Select start step...</option>
+                      {workflow.steps.sort((a,b) => a.step_order - b.step_order).map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.step_order}. {s.name} ({s.step_type})
+                        </option>
+                      ))}
+                    </select>
+                    {workflow.start_step_id && (() => {
+                      const selected = workflow.steps.find(s => String(s.id) === String(workflow.start_step_id));
+                      return selected ? (
+                        <div className="flex items-center gap-2 p-3 bg-emerald-50 rounded-xl border border-emerald-100">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                          <span className="text-sm font-medium text-emerald-700">Start: {selected.name}</span>
+                          <span className="text-xs text-emerald-500 capitalize">({selected.step_type})</span>
+                        </div>
+                      ) : null;
+                    })()}
+                  </div>
+                ) : (
+                  <div className="p-4 bg-gray-50 rounded-xl text-center text-gray-400 text-sm">
+                    Add steps first to set start step
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Section 2: Input Schema */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
@@ -386,7 +486,7 @@ export default function WorkflowEditor() {
                     No steps added yet
                   </div>
                 ) : (
-                  workflow.steps?.sort((a,b) => a.order_index - b.order_index).map((step, idx) => (
+                  workflow.steps?.sort((a,b) => a.step_order - b.step_order).map((step, idx) => (
                     <div key={step.id} className="group flex items-center gap-4 p-4 rounded-xl border border-gray-100 hover:border-indigo-200 hover:bg-indigo-50/30 transition">
                       <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-sm shrink-0">
                         {idx + 1}
@@ -407,7 +507,7 @@ export default function WorkflowEditor() {
                       <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition">
                         <Link 
                           to={`/workflows/${id}/steps/${step.id}/rules`}
-                          className="px-3 py-1 text-xs font-semibold text-indigo-600 hover:bg-indigo-100 rounded-lg transition"
+                          className="px-3 py-1 text-xs font-semibold text-indigo-600 border border-indigo-200 hover:bg-indigo-100 rounded-lg transition"
                         >
                           Edit Rules
                         </Link>
@@ -466,7 +566,7 @@ export default function WorkflowEditor() {
                     <div className="h-px bg-gray-100 flex-1"/>
                   </h5>
                   <div className="space-y-0.5 ml-2">
-                    {workflow.steps?.sort((a,b) => a.order_index - b.order_index).map((s, i, arr) => (
+                    {workflow.steps?.sort((a,b) => a.step_order - b.step_order).map((s, i, arr) => (
                       <React.Fragment key={s.id}>
                         <div className="flex items-center gap-3">
                           <div className={`w-8 h-8 rounded-full border-2 border-indigo-600 flex items-center justify-center font-bold text-xs ${i === arr.length - 1 ? 'bg-indigo-600 text-white' : 'text-indigo-600'}`}>
@@ -494,7 +594,7 @@ export default function WorkflowEditor() {
       {/* ── STEP MODAL ─────────────────────────────────────────────────── */}
       <Modal 
         isOpen={isStepModalOpen} 
-        onClose={() => setIsStepModalOpen(false)} 
+        onClose={handleCloseModal} 
         title={editingStep ? 'Edit Step' : 'Add New Step'}
         size="md"
       >
@@ -522,9 +622,10 @@ export default function WorkflowEditor() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Order Index</label>
               <input 
-                type="number" value={stepForm.order_index}
-                onChange={e => setStepForm({...stepForm, order_index: parseInt(e.target.value)})}
+                type="number" value={stepForm.step_order}
+                onChange={e => setStepForm({...stepForm, step_order: parseInt(e.target.value) || 1})}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                min="1"
               />
             </div>
           </div>
@@ -615,7 +716,7 @@ export default function WorkflowEditor() {
 
           <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
             <button
-              onClick={() => setIsStepModalOpen(false)}
+              onClick={handleCloseModal}
               className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg font-medium transition"
             >
               Cancel

@@ -99,7 +99,7 @@ export default function WorkflowList() {
 
       setStats({
         total:      wfArr.length,
-        active:     wfArr.filter((w) => w.status === 'active').length,
+        active:     wfArr.filter((w) => w.is_active === 1 || w.is_active === true || w.status === 'active').length,
         executions: exArr.length,
         failed:     exArr.filter((e) => e.status === 'failed').length,
       });
@@ -168,7 +168,7 @@ export default function WorkflowList() {
         <select
           value={statusFilter}
           onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent min-w-[140px]"
         >
           <option value="">All Statuses</option>
           <option value="active">Active</option>

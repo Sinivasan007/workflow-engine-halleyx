@@ -1,6 +1,16 @@
 const pool = require('../config/db');
 const { v4: uuidv4 } = require('uuid');
 
+/** Sanitize next_step_id: convert 'null', '', '__END__' → actual null */
+function sanitizeNextStepId(val) {
+  if (val === null || val === undefined) return null;
+  if (typeof val === 'string') {
+    const t = val.trim();
+    if (t === '' || t === 'null' || t === 'undefined' || t === '__END__') return null;
+  }
+  return val;
+}
+
 // POST /steps/:step_id/rules
 const addRule = async (req, res) => {
   try {
@@ -22,7 +32,7 @@ const addRule = async (req, res) => {
         id,
         step_id,
         condition_expr,
-        next_step_id || null,
+        sanitizeNextStepId(next_step_id),
         priority || 1,
         now,
         now,
@@ -68,7 +78,7 @@ const updateRule = async (req, res) => {
       `UPDATE rules SET condition_expr = ?, next_step_id = ?, priority = ?, updated_at = ? WHERE id = ?`,
       [
         condition_expr ?? existing[0].condition_expr,
-        next_step_id !== undefined ? next_step_id : existing[0].next_step_id,
+        next_step_id !== undefined ? sanitizeNextStepId(next_step_id) : existing[0].next_step_id,
         priority ?? existing[0].priority,
         now,
         id,

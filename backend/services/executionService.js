@@ -15,6 +15,16 @@ const { getNextStep } = require('./ruleEngine');
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Convert the string 'null', empty string, or 'undefined' to actual null. */
+function normalizeNull(val) {
+  if (val === null || val === undefined) return null;
+  if (typeof val === 'string') {
+    const trimmed = val.trim();
+    if (trimmed === '' || trimmed === 'null' || trimmed === 'undefined') return null;
+  }
+  return val;
+}
+
 /** Safely parse JSON stored as a string in MySQL, or return the value as-is. */
 function parseJSON(value) {
   if (value === null || value === undefined) return null;
@@ -115,7 +125,7 @@ async function runExecution(executionId, db) {
     }
 
     // ── 6 & 7. Determine the current step (start step or mid-flow resume) ───
-    let currentStepId = execution.current_step_id || workflow.start_step_id;
+    let currentStepId = normalizeNull(execution.current_step_id) || normalizeNull(workflow.start_step_id);
 
     // Validate the step belongs to this workflow
     const [[belongsCheck]] = await db.execute(
@@ -129,7 +139,18 @@ async function runExecution(executionId, db) {
     }
 
     // ── Parse input_data ─────────────────────────────────────────────────────
-    const inputData = parseJSON(execution.input_data) || {};
+    // MySQL may return input_data as a JSON string OR already-parsed object
+    const rawInput = execution.input_data || '{}';
+    let inputData = typeof rawInput === 'string'
+      ? (() => { try { return JSON.parse(rawInput); } catch { return {}; } })()
+      : (typeof rawInput === 'object' ? rawInput : {});
+
+    // Unwrap double-nesting: { input_data: { salary: 75000 } } → { salary: 75000 }
+    if (inputData.input_data && typeof inputData.input_data === 'object' && !Array.isArray(inputData.input_data)) {
+      inputData = inputData.input_data;
+    }
+
+    console.log('[executionService] Parsed inputData type:', typeof inputData, '| keys:', Object.keys(inputData));
 
     // ── Loop-detection tracker ───────────────────────────────────────────────
     const maxIterations = 10;
@@ -229,7 +250,7 @@ async function runExecution(executionId, db) {
         }
       }
 
-      const nextStepId = matchedRule ? matchedRule.next_step_id : null;
+      const nextStepId = matchedRule ? normalizeNull(matchedRule.next_step_id) : null;
 
       // Resolve next step UUID → human-readable name for selected_next_step
       let nextStepName = null;

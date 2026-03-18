@@ -1,12 +1,16 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import {
   Plus, Search, Pencil, Play, Trash2,
-  GitBranch, BarChart3, AlertCircle, ChevronLeft, ChevronRight,
+  GitBranch, CheckCircle, AlertCircle,
+  ChevronLeft, ChevronRight, Copy, Check,
 } from 'lucide-react';
 import Layout from '../components/Layout';
 import StatusBadge from '../components/StatusBadge';
-import Modal from '../components/Modal';
+import MetricCard from '../components/ui/MetricCard';
+import ConfirmModal from '../components/ui/ConfirmModal';
+import { SkeletonRow } from '../components/ui/LoadingSkeleton';
 import { useToast } from '../components/Toast';
 import { getWorkflows, deleteWorkflow, getExecutions } from '../services/api';
 
@@ -14,56 +18,30 @@ import { getWorkflows, deleteWorkflow, getExecutions } from '../services/api';
 const fmt = (d) => {
   if (!d) return '—';
   const dt = new Date(d);
-  return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) +
-    ', ' + dt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 };
 const trunc = (id) => (id || '').substring(0, 8);
 
-/* ── skeleton row ─────────────────────────────────────────────────────── */
-function SkeletonRow() {
-  return (
-    <tr className="animate-pulse">
-      {[...Array(7)].map((_, i) => (
-        <td key={i} className="px-4 py-4">
-          <div className="h-4 bg-gray-200 rounded w-3/4" />
-        </td>
-      ))}
-    </tr>
-  );
-}
-
-/* ── stat card ─────────────────────────────────────────────────────────── */
-function StatCard({ label, value, icon: Icon, color }) {
-  return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex items-center gap-4">
-      <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${color}`}>
-        <Icon className="w-6 h-6 text-white" />
-      </div>
-      <div>
-        <p className="text-2xl font-bold text-gray-900">{value}</p>
-        <p className="text-sm text-gray-500">{label}</p>
-      </div>
-    </div>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════════════ */
 export default function WorkflowList() {
   const navigate = useNavigate();
   const { showToast } = useToast();
 
-  const [workflows, setWorkflows]     = useState([]);
-  const [loading, setLoading]         = useState(true);
-  const [search, setSearch]           = useState('');
+  const [workflows, setWorkflows]       = useState([]);
+  const [loading, setLoading]           = useState(true);
+  const [search, setSearch]             = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const [page, setPage]               = useState(1);
-  const [totalPages, setTotalPages]   = useState(1);
-  const [totalCount, setTotalCount]   = useState(0);
-  const [stats, setStats]             = useState({ total: 0, active: 0, executions: 0, failed: 0 });
+  const [page, setPage]                 = useState(1);
+  const [totalPages, setTotalPages]     = useState(1);
+  const [totalCount, setTotalCount]     = useState(0);
+  const [stats, setStats]               = useState({ total: 0, active: 0, executions: 0, failed: 0 });
 
   /* delete modal */
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting]         = useState(false);
+
+  /* copy state */
+  const [copiedId, setCopiedId]         = useState(null);
 
   /* ── fetch workflows ─────────────────────────────────────────────── */
   const fetchWorkflows = useCallback(async () => {
@@ -128,201 +106,262 @@ export default function WorkflowList() {
     }
   };
 
+  /* ── copy ID ─────────────────────────────────────────────────────── */
+  const handleCopy = (id) => {
+    navigator.clipboard.writeText(id);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  /* ── pagination helpers ──────────────────────────────────────────── */
+  const pageNumbers = [];
+  for (let i = 1; i <= totalPages; i++) pageNumbers.push(i);
+
   /* ── render ──────────────────────────────────────────────────────── */
   return (
     <Layout title="Workflows">
-      {/* header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Workflows</h2>
-          <p className="text-gray-500 text-sm mt-1">Manage and execute your workflows</p>
-        </div>
-        <button
-          onClick={() => navigate('/workflows/new')}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition"
-        >
-          <Plus className="w-4 h-4" /> New Workflow
-        </button>
-      </div>
-
-      {/* stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard label="Total Workflows" value={stats.total}      icon={GitBranch}   color="bg-indigo-600" />
-        <StatCard label="Active Workflows" value={stats.active}    icon={BarChart3}   color="bg-emerald-500" />
-        <StatCard label="Total Executions" value={stats.executions} icon={Play}        color="bg-blue-500" />
-        <StatCard label="Failed Executions" value={stats.failed}   icon={AlertCircle} color="bg-red-500" />
-      </div>
-
-      {/* search / filter */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-6 flex flex-col sm:flex-row items-center gap-3">
-        <div className="relative flex-1 w-full">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search workflows..."
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            className="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-          />
-        </div>
-        <select
-          value={statusFilter}
-          onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent min-w-[140px]"
-        >
-          <option value="">All Statuses</option>
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-        </select>
-        <span className="text-xs text-gray-400 whitespace-nowrap">
-          Showing {workflows.length} of {totalCount}
-        </span>
-      </div>
-
-      {/* table */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="overflow-x-auto w-full">
-        <table className="w-full min-w-[900px]">
-          <thead>
-            <tr className="bg-gray-50 text-xs font-semibold text-gray-500 uppercase">
-              <th className="px-4 py-3 text-left">ID</th>
-              <th className="px-4 py-3 text-left">Name</th>
-              <th className="px-4 py-3 text-center">Steps</th>
-              <th className="px-4 py-3 text-center">Version</th>
-              <th className="px-4 py-3 text-center">Status</th>
-              <th className="px-4 py-3 text-left">Created</th>
-              <th className="px-4 py-3 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading
-              ? [...Array(5)].map((_, i) => <SkeletonRow key={i} />)
-              : workflows.length === 0
-              ? (
-                <tr>
-                  <td colSpan={7}>
-                    <div className="flex flex-col items-center justify-center py-16 text-gray-400">
-                      <GitBranch className="w-12 h-12 mb-3 text-gray-300" />
-                      <p className="font-semibold text-gray-600 text-lg">No workflows yet</p>
-                      <p className="text-sm mt-1">Create your first workflow to get started</p>
-                      <button
-                        onClick={() => navigate('/workflows/new')}
-                        className="mt-4 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition"
-                      >
-                        <Plus className="w-4 h-4" /> Create Workflow
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              )
-              : workflows.map((wf) => (
-                <tr
-                  key={wf.id}
-                  className="hover:bg-gray-50 border-b border-gray-100 transition"
-                >
-                  <td className="px-4 py-3 font-mono text-xs text-gray-400">
-                    {trunc(wf.id)}
-                  </td>
-                  <td className="px-4 py-3 font-semibold text-gray-900">
-                    {wf.name}
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold">
-                      {wf.step_count || 0}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-center text-sm text-gray-600">
-                    v{wf.version || 1}
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <StatusBadge status={wf.is_active ? 'active' : 'inactive'} size="sm" />
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">
-                    {fmt(wf.created_at)}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <button
-                        onClick={() => navigate(`/workflows/${wf.id}/edit`)}
-                        className="p-1.5 rounded-lg text-indigo-600 hover:bg-indigo-50 transition"
-                        title="Edit"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => navigate(`/workflows/${wf.id}/execute`)}
-                        className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 transition"
-                        title="Execute"
-                      >
-                        <Play className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => setDeleteTarget(wf)}
-                        className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 transition"
-                        title="Delete"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-          </tbody>
-        </table>
-        </div>
-      </div>
-
-      {/* pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between mt-4">
-          <button
-            disabled={page <= 1}
-            onClick={() => setPage((p) => p - 1)}
-            className="flex items-center gap-1 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-lg text-sm disabled:opacity-40 disabled:cursor-not-allowed transition"
-          >
-            <ChevronLeft className="w-4 h-4" /> Previous
-          </button>
-          <span className="text-sm text-gray-500">
-            Page {page} of {totalPages}
-          </span>
-          <button
-            disabled={page >= totalPages}
-            onClick={() => setPage((p) => p + 1)}
-            className="flex items-center gap-1 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-lg text-sm disabled:opacity-40 disabled:cursor-not-allowed transition"
-          >
-            Next <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
-      )}
-
-      {/* delete modal */}
-      <Modal
-        isOpen={!!deleteTarget}
-        onClose={() => setDeleteTarget(null)}
-        title="Delete Workflow?"
-        size="sm"
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
       >
-        <p className="text-gray-600 text-sm mb-6">
-          This will permanently delete <strong>{deleteTarget?.name}</strong> and
-          all its steps, rules, and execution history.
-        </p>
-        <div className="flex justify-end gap-3">
-          <button
-            onClick={() => setDeleteTarget(null)}
-            className="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition"
+        {/* ── header ──────────────────────────────────────────────── */}
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h2 className="text-2xl font-bold text-white">Workflows</h2>
+            <p className="text-[#94A3B8] text-sm mt-1">Manage and execute your workflows</p>
+          </div>
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => navigate('/workflows/new')}
+            className="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-xl font-medium flex items-center gap-2 transition-all duration-200 hover:shadow-[0_0_20px_rgba(99,102,241,0.4)]"
           >
-            Cancel
-          </button>
-          <button
-            onClick={handleDelete}
-            disabled={deleting}
-            className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition disabled:opacity-60"
-          >
-            <Trash2 className="w-4 h-4" />
-            {deleting ? 'Deleting...' : 'Delete'}
-          </button>
+            <Plus className="w-4 h-4" /> New Workflow
+          </motion.button>
         </div>
-      </Modal>
+
+        {/* ── stats ───────────────────────────────────────────────── */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <MetricCard label="Total Workflows"  value={stats.total}      icon={GitBranch}   color="indigo" index={0} />
+          <MetricCard label="Active Workflows"  value={stats.active}    icon={CheckCircle} color="green"  index={1} trend={{ up: true, value: 'active' }} />
+          <MetricCard label="Total Executions"  value={stats.executions} icon={Play}        color="blue"   index={2} />
+          <MetricCard label="Failed Executions" value={stats.failed}    icon={AlertCircle} color="red"    index={3} />
+        </div>
+
+        {/* ── search / filter ─────────────────────────────────────── */}
+        <div className="bg-[#141428] border border-[#2D2D5E] rounded-2xl p-4 mb-6 flex flex-col sm:flex-row items-center gap-4">
+          <div className="relative flex-1 w-full">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#64748B]" />
+            <input
+              type="text"
+              placeholder="Search workflows..."
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+              className="w-full bg-[#0A0A14] border border-[#2D2D5E] text-white rounded-xl pl-10 pr-4 py-2.5 text-sm placeholder-[#64748B] focus:outline-none focus:border-indigo-500 focus:shadow-[0_0_0_3px_rgba(99,102,241,0.1)] transition-all duration-200"
+            />
+          </div>
+          <select
+            value={statusFilter}
+            onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+            className="bg-[#0A0A14] border border-[#2D2D5E] text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500 min-w-[140px] transition-all duration-200"
+          >
+            <option value="">All Statuses</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+          <span className="text-xs text-[#64748B] whitespace-nowrap">
+            Showing {workflows.length} of {totalCount} workflows
+          </span>
+        </div>
+
+        {/* ── table ───────────────────────────────────────────────── */}
+        <div className="bg-[#141428] border border-[#2D2D5E] rounded-2xl overflow-hidden">
+          <div className="overflow-x-auto w-full">
+            <table className="w-full min-w-[900px]">
+              <thead>
+                <tr className="bg-[#0A0A14] border-b border-[#2D2D5E]">
+                  <th className="px-6 py-4 text-left text-[#64748B] text-xs uppercase tracking-wider font-medium">ID</th>
+                  <th className="px-6 py-4 text-left text-[#64748B] text-xs uppercase tracking-wider font-medium">Name</th>
+                  <th className="px-6 py-4 text-center text-[#64748B] text-xs uppercase tracking-wider font-medium">Steps</th>
+                  <th className="px-6 py-4 text-center text-[#64748B] text-xs uppercase tracking-wider font-medium">Version</th>
+                  <th className="px-6 py-4 text-center text-[#64748B] text-xs uppercase tracking-wider font-medium">Status</th>
+                  <th className="px-6 py-4 text-left text-[#64748B] text-xs uppercase tracking-wider font-medium">Created</th>
+                  <th className="px-6 py-4 text-right text-[#64748B] text-xs uppercase tracking-wider font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading
+                  ? [...Array(5)].map((_, i) => <SkeletonRow key={i} cols={7} />)
+                  : workflows.length === 0
+                  ? (
+                    <tr>
+                      <td colSpan={7}>
+                        <div className="flex flex-col items-center justify-center py-20">
+                          <GitBranch className="w-16 h-16 mb-4 text-[#2D2D5E]" />
+                          <p className="font-semibold text-white text-lg">No workflows found</p>
+                          <p className="text-[#94A3B8] text-sm mt-1">Create your first workflow to get started</p>
+                          <motion.button
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => navigate('/workflows/new')}
+                            className="mt-5 border border-indigo-500/50 text-indigo-400 hover:bg-indigo-500/10 px-5 py-2.5 rounded-xl text-sm font-medium flex items-center gap-2 transition-all"
+                          >
+                            <Plus className="w-4 h-4" /> Create Workflow
+                          </motion.button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                  : workflows.map((wf, index) => (
+                    <motion.tr
+                      key={wf.id}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                      className="border-b border-[#1A1A35] hover:bg-[#1A1A35] transition-colors group"
+                    >
+                      {/* ID */}
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-xs text-[#64748B]">{trunc(wf.id)}</span>
+                          <button
+                            onClick={() => handleCopy(wf.id)}
+                            className="opacity-0 group-hover:opacity-100 p-1 rounded-md hover:bg-[#2D2D5E] transition-all"
+                            title="Copy full ID"
+                          >
+                            {copiedId === wf.id
+                              ? <Check className="w-3 h-3 text-green-400" />
+                              : <Copy className="w-3 h-3 text-[#64748B]" />
+                            }
+                          </button>
+                        </div>
+                      </td>
+
+                      {/* Name */}
+                      <td className="px-6 py-4">
+                        <span
+                          className="text-white font-semibold hover:text-indigo-400 cursor-pointer transition"
+                          onClick={() => navigate(`/workflows/${wf.id}/edit`)}
+                        >
+                          {wf.name}
+                        </span>
+                      </td>
+
+                      {/* Steps */}
+                      <td className="px-6 py-4 text-center">
+                        <span className="inline-flex items-center justify-center bg-[#1A1A35] border border-[#2D2D5E] text-[#94A3B8] text-xs rounded-full px-2.5 py-0.5 font-medium">
+                          {wf.step_count || 0}
+                        </span>
+                      </td>
+
+                      {/* Version */}
+                      <td className="px-6 py-4 text-center text-sm text-[#64748B]">
+                        v{wf.version || 1}
+                      </td>
+
+                      {/* Status */}
+                      <td className="px-6 py-4 text-center">
+                        <StatusBadge status={wf.is_active ? 'active' : 'inactive'} size="sm" />
+                      </td>
+
+                      {/* Created */}
+                      <td className="px-6 py-4 text-sm text-[#64748B] whitespace-nowrap">
+                        {fmt(wf.created_at)}
+                      </td>
+
+                      {/* Actions */}
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => navigate(`/workflows/${wf.id}/edit`)}
+                            className="p-1.5 rounded-lg text-[#64748B] hover:text-indigo-400 hover:bg-indigo-500/10 transition-all"
+                            title="Edit Workflow"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => navigate(`/workflows/${wf.id}/execute`)}
+                            className="p-1.5 rounded-lg text-[#64748B] hover:text-green-400 hover:bg-green-500/10 transition-all"
+                            title="Execute Workflow"
+                          >
+                            <Play className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => setDeleteTarget(wf)}
+                            className="p-1.5 rounded-lg text-[#64748B] hover:text-red-400 hover:bg-red-500/10 transition-all"
+                            title="Delete Workflow"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </motion.tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* ── pagination ─────────────────────────────────────────── */}
+          {totalPages > 1 && (
+            <div className="bg-[#0A0A14] border-t border-[#2D2D5E] px-6 py-4 flex items-center justify-between">
+              <span className="text-sm text-[#64748B]">
+                Showing {(page - 1) * 10 + 1}-{Math.min(page * 10, totalCount)} of {totalCount} workflows
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  disabled={page <= 1}
+                  onClick={() => setPage((p) => p - 1)}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm text-[#94A3B8] hover:text-white hover:bg-[#1A1A35] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                >
+                  <ChevronLeft className="w-4 h-4" /> Previous
+                </button>
+                {pageNumbers.map((n) => (
+                  <button
+                    key={n}
+                    onClick={() => setPage(n)}
+                    className={`w-8 h-8 rounded-lg text-sm font-medium transition-all ${
+                      n === page
+                        ? 'bg-indigo-600 text-white shadow-[0_0_10px_rgba(99,102,241,0.3)]'
+                        : 'text-[#94A3B8] hover:bg-[#1A1A35] hover:text-white'
+                    }`}
+                  >
+                    {n}
+                  </button>
+                ))}
+                <button
+                  disabled={page >= totalPages}
+                  onClick={() => setPage((p) => p + 1)}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm text-[#94A3B8] hover:text-white hover:bg-[#1A1A35] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                >
+                  Next <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ── delete modal ────────────────────────────────────────── */}
+        <ConfirmModal
+          isOpen={!!deleteTarget}
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={handleDelete}
+          title="Delete Workflow?"
+          message={`This will permanently delete "${deleteTarget?.name}" and all its steps, rules, and execution history.`}
+          loading={deleting}
+        />
+
+        {/* ── floating action button ──────────────────────────────── */}
+        <motion.button
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+          onClick={() => navigate('/workflows/new')}
+          className="fixed bottom-8 right-8 w-14 h-14 bg-indigo-600 rounded-full shadow-[0_0_30px_rgba(99,102,241,0.4)] hover:bg-indigo-500 flex items-center justify-center transition-all z-30"
+          title="New Workflow"
+        >
+          <Plus className="w-6 h-6 text-white" />
+        </motion.button>
+      </motion.div>
     </Layout>
   );
 }

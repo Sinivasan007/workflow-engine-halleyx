@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { 
   Plus, Trash2, Edit2, ChevronRight,
   AlertTriangle, Lightbulb, Settings, Save, X, Info
 } from 'lucide-react';
 import Layout from '../components/Layout';
+import StatusBadge from '../components/StatusBadge';
 import { useToast } from '../components/Toast';
 import { 
   getWorkflow, getRules, createRule, 
@@ -55,7 +57,6 @@ export default function RuleEditor() {
     e.preventDefault();
     if (!ruleForm.condition_expr) return showToast('Condition is required', 'error');
 
-    // Normalize next_step_id: convert 'null', empty string, or '__END__' to actual null
     const cleanNextStepId = (!ruleForm.next_step_id || ruleForm.next_step_id === 'null' || ruleForm.next_step_id === '__END__')
       ? null
       : ruleForm.next_step_id;
@@ -101,101 +102,133 @@ export default function RuleEditor() {
     }
   };
 
+  const appendToCondition = (op) => {
+    setRuleForm(prev => ({ ...prev, condition_expr: prev.condition_expr + (prev.condition_expr ? ' ' : '') + op }));
+  };
+
   const hasDefault = rules.some(r => r.condition_expr.toUpperCase() === 'DEFAULT');
 
-  if (loading) return <Layout title="Loading Rules..."><div className="animate-pulse h-64 bg-gray-100 rounded-2xl"/></Layout>;
+  if (loading) return (
+    <Layout title="Loading Rules...">
+      <div className="animate-pulse space-y-4">
+        <div className="h-20 bg-[#1A1A35] rounded-2xl"/>
+        <div className="h-64 bg-[#1A1A35] rounded-2xl"/>
+      </div>
+    </Layout>
+  );
 
   return (
     <Layout title="Rule Editor">
-      <div className="max-w-5xl mx-auto space-y-6">
-        
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="max-w-5xl mx-auto space-y-6"
+      >
         {/* Breadcrumb */}
-        <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
-          <Link to="/workflows" className="hover:text-indigo-600 transition">Workflows</Link>
+        <div className="flex items-center gap-2 text-sm text-[#64748B] mb-2">
+          <Link to="/workflows" className="hover:text-indigo-400 transition">Workflows</Link>
           <ChevronRight className="w-4 h-4" />
-          <Link to={`/workflows/${id}/edit`} className="hover:text-indigo-600 transition truncate max-w-[150px]">{workflow?.name}</Link>
+          <Link to={`/workflows/${id}/edit`} className="hover:text-indigo-400 transition truncate max-w-[150px]">{workflow?.name}</Link>
           <ChevronRight className="w-4 h-4" />
-          <span className="text-gray-900 font-medium">{step?.name}</span>
+          <span className="text-white font-medium">{step?.name}</span>
           <ChevronRight className="w-4 h-4" />
-          <span className="text-gray-900 font-medium">Rules</span>
+          <span className="text-white font-medium">Rules</span>
         </div>
 
         {/* Step Info Banner */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex items-center justify-between">
+        <div className="bg-[#141428] border border-[#2D2D5E] rounded-2xl p-6 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600">
-              <Settings className="w-6 h-6" />
+            <div className="w-12 h-12 bg-indigo-500/20 rounded-xl flex items-center justify-center">
+              <Settings className="w-6 h-6 text-indigo-400" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-gray-900">{step?.name}</h2>
+              <h2 className="text-xl font-bold text-white">{step?.name}</h2>
               <div className="flex items-center gap-3 mt-1 text-sm">
-                <span className="text-gray-500 capitalize">Type: <strong className="text-gray-700">{step?.step_type}</strong></span>
-                <span className="w-1 h-1 rounded-full bg-gray-300" />
-                <span className="text-gray-500">Workflow: <strong className="text-gray-700">{workflow?.name}</strong></span>
+                <span className="text-[#94A3B8]">Type: <StatusBadge status={step?.step_type} size="sm" /></span>
+                <span className="w-1 h-1 rounded-full bg-[#2D2D5E]" />
+                <span className="text-[#94A3B8]">Workflow: <strong className="text-white">{workflow?.name}</strong></span>
               </div>
             </div>
           </div>
-          <button onClick={() => navigate(`/workflows/${id}/edit`)} className="p-2 hover:bg-gray-100 rounded-lg text-gray-400">
+          <button onClick={() => navigate(`/workflows/${id}/edit`)} className="p-2 hover:bg-[#1A1A35] rounded-lg text-[#64748B] hover:text-white transition">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Default Rule Warning */}
         {!hasDefault && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-yellow-500 mt-0.5" />
+          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-yellow-400 mt-0.5" />
             <div>
-              <h4 className="text-sm font-bold text-yellow-800">⚠️ No DEFAULT rule found!</h4>
-              <p className="text-sm text-yellow-700">Add a rule with condition <code className="bg-yellow-100 px-1 rounded font-bold">DEFAULT</code> to handle unmatched scenarios and prevent execution failure.</p>
+              <h4 className="text-sm font-bold text-yellow-400">⚠️ No DEFAULT rule found!</h4>
+              <p className="text-sm text-yellow-400/80">Add a rule with condition <code className="bg-yellow-500/20 px-1.5 rounded font-bold text-yellow-300">DEFAULT</code> to handle unmatched scenarios.</p>
             </div>
           </div>
         )}
 
         {/* Rules Table */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="bg-[#141428] border border-[#2D2D5E] rounded-2xl overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-gray-50 text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100">
-                <th className="px-6 py-4 text-left w-24">Priority</th>
-                <th className="px-6 py-4 text-left">Condition</th>
-                <th className="px-6 py-4 text-left">Next Step</th>
-                <th className="px-6 py-4 text-right">Actions</th>
+              <tr className="bg-[#0A0A14] border-b border-[#2D2D5E]">
+                <th className="px-6 py-4 text-left text-[#64748B] text-xs uppercase tracking-wider font-medium w-24">Priority</th>
+                <th className="px-6 py-4 text-left text-[#64748B] text-xs uppercase tracking-wider font-medium">Condition</th>
+                <th className="px-6 py-4 text-left text-[#64748B] text-xs uppercase tracking-wider font-medium">Next Step</th>
+                <th className="px-6 py-4 text-right text-[#64748B] text-xs uppercase tracking-wider font-medium">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
-              {rules.sort((a,b) => a.priority - b.priority).map((r) => {
+            <tbody>
+              {rules.sort((a,b) => a.priority - b.priority).map((r, index) => {
                 const isDef = r.condition_expr.toUpperCase() === 'DEFAULT';
                 return (
-                  <tr key={r.id} className={`${isDef ? 'bg-amber-50/50' : 'hover:bg-gray-50'} transition-colors`}>
+                  <motion.tr 
+                    key={r.id}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                    className={`border-b border-[#1A1A35] transition-colors ${isDef ? 'bg-yellow-500/5 border-l-4 border-l-yellow-500' : 'hover:bg-[#1A1A35]'}`}
+                  >
                     <td className="px-6 py-4">
-                      {isDef ? <span className="text-amber-600 font-bold">DEFAULT</span> : <span className="px-2 py-0.5 bg-gray-100 rounded-lg font-mono">{r.priority}</span>}
+                      {isDef 
+                        ? <span className="text-yellow-400 font-bold text-xs">DEFAULT</span> 
+                        : <span className="w-8 h-8 bg-indigo-600/20 text-indigo-400 rounded-full flex items-center justify-center font-bold text-sm">{r.priority}</span>
+                      }
                     </td>
-                    <td className="px-6 py-4 font-mono text-indigo-600 font-medium">
-                      {r.condition_expr}
+                    <td className="px-6 py-4">
+                      <code className={`text-sm font-mono px-3 py-1.5 rounded-lg border ${
+                        isDef 
+                          ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400' 
+                          : 'bg-[#0A0A14] border-[#2D2D5E] text-[#94A3B8]'
+                      }`}>
+                        {r.condition_expr}
+                      </code>
                     </td>
-                    <td className="px-6 py-4 font-medium text-gray-700">
-                      {workflow?.steps?.find(s => s.id === r.next_step_id)?.name || <span className="text-red-500 italic">End Workflow</span>}
+                    <td className="px-6 py-4">
+                      <span className="flex items-center gap-2 text-indigo-400 font-medium">
+                        → {workflow?.steps?.find(s => s.id === r.next_step_id)?.name || <span className="text-[#64748B] italic">🏁 End Workflow</span>}
+                      </span>
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-1">
-                        <button onClick={() => startEdit(r)} className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition">
+                        <button onClick={() => startEdit(r)} className="p-1.5 text-[#64748B] hover:text-indigo-400 hover:bg-indigo-500/10 rounded-lg transition-all">
                           <Edit2 className="w-4 h-4" />
                         </button>
-                        <button onClick={() => handleDeleteRule(r.id)} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition">
+                        <button onClick={() => handleDeleteRule(r.id)} className="p-1.5 text-[#64748B] hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all">
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                     </td>
-                  </tr>
+                  </motion.tr>
                 );
               })}
               {rules.length === 0 && (
                 <tr>
-                  <td colSpan="4" className="px-6 py-12 text-center">
-                    <div className="flex flex-col items-center justify-center text-gray-400">
-                      <AlertTriangle className="w-10 h-10 mb-2 opacity-20" />
-                      <p className="font-medium">No rules defined for this step yet.</p>
-                      <p className="text-xs">Add one below to handle flow logic.</p>
+                  <td colSpan="4" className="px-6 py-16 text-center">
+                    <div className="flex flex-col items-center justify-center">
+                      <AlertTriangle className="w-12 h-12 mb-3 text-[#2D2D5E]" />
+                      <p className="font-medium text-white">No rules defined for this step yet.</p>
+                      <p className="text-xs text-[#64748B] mt-1">Add one below to handle flow logic.</p>
                     </div>
                   </td>
                 </tr>
@@ -204,109 +237,123 @@ export default function RuleEditor() {
           </table>
         </div>
 
-        {/* Add/Edit Rule Card */}
+        {/* Add/Edit Rule Card + Syntax Panel */}
         <div className="grid grid-cols-12 gap-8">
           <div className="col-span-12 lg:col-span-8">
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-              <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
-                {editingRule ? <Edit2 className="w-5 h-5 text-indigo-600" /> : <Plus className="w-5 h-5 text-indigo-600" />}
+            <div className="bg-[#141428] border border-[#2D2D5E] rounded-2xl p-6">
+              <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
+                {editingRule ? <Edit2 className="w-5 h-5 text-indigo-400" /> : <Plus className="w-5 h-5 text-indigo-400" />}
                 {editingRule ? 'Edit Existing Rule' : 'Add New Rule'}
               </h3>
               
               <form onSubmit={handleSaveRule} className="space-y-6">
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1.5">Condition Expression *</label>
+                  <label className="block text-xs font-bold text-[#94A3B8] uppercase tracking-wider mb-2">Condition Expression *</label>
                   <input 
                     type="text"
                     value={ruleForm.condition_expr}
                     onChange={e => setRuleForm({...ruleForm, condition_expr: e.target.value})}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-3 font-mono text-indigo-600 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+                    className="w-full bg-[#0A0A14] border border-[#2D2D5E] text-white rounded-xl px-4 py-3 font-mono text-sm placeholder-[#64748B] focus:outline-none focus:border-indigo-500 focus:shadow-[0_0_0_3px_rgba(99,102,241,0.1)] transition-all"
                     placeholder="amount > 100 && country == 'US'"
                   />
-                  <div className="mt-2 text-xs text-gray-500 flex items-center gap-4">
-                    <span>Operators: <code className="bg-gray-100 px-1 rounded">==</code> <code className="bg-gray-100 px-1 rounded">!=</code> <code className="bg-gray-100 px-1 rounded">&&</code> <code className="bg-gray-100 px-1 rounded">||</code></span>
-                    <span>Reserved: <code className="bg-amber-100 text-amber-600 px-1 rounded font-bold">DEFAULT</code></span>
+                  {/* Operator pills */}
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {['==', '!=', '>', '<', '>=', '<=', '&&', '||', 'DEFAULT'].map(op => (
+                      <button
+                        key={op}
+                        type="button"
+                        onClick={() => appendToCondition(op)}
+                        className={`px-2 py-1 rounded-lg text-xs font-mono transition-all border ${
+                          op === 'DEFAULT'
+                            ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/20'
+                            : 'bg-[#0A0A14] border-[#2D2D5E] text-indigo-400 hover:bg-indigo-500/10'
+                        }`}
+                      >
+                        {op}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-6">
                   <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-1.5">Priority</label>
+                    <label className="block text-xs font-bold text-[#94A3B8] uppercase tracking-wider mb-2">Priority</label>
                     <input 
                       type="number"
                       value={ruleForm.priority}
                       onChange={e => setRuleForm({...ruleForm, priority: parseInt(e.target.value)})}
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2"
+                      className="w-full bg-[#0A0A14] border border-[#2D2D5E] text-white rounded-xl px-4 py-3 focus:outline-none focus:border-indigo-500 transition-all"
                       placeholder="1"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-1.5">Next Step *</label>
+                    <label className="block text-xs font-bold text-[#94A3B8] uppercase tracking-wider mb-2">Next Step *</label>
                     <select 
                       value={ruleForm.next_step_id}
                       onChange={e => setRuleForm({...ruleForm, next_step_id: e.target.value})}
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500"
+                      className="w-full bg-[#0A0A14] border border-[#2D2D5E] text-white rounded-xl px-4 py-3 focus:outline-none focus:border-indigo-500 transition-all"
                     >
                       <option value="">Select a step...</option>
+                      <option value="__END__">🏁 End Workflow</option>
                       {workflow?.steps?.filter(s => s.id !== stepId).map(s => (
-                        <option key={s.id} value={s.id}>{s.name}</option>
+                        <option key={s.id} value={s.id}>{s.name} ({s.step_type})</option>
                       ))}
-                      <option value="__END__" className="text-gray-400 italic">— End Workflow —</option>
                     </select>
                   </div>
                 </div>
 
-                <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-50">
+                <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#2D2D5E]">
                   {editingRule && (
                     <button 
                       type="button" 
                       onClick={() => { setEditingRule(null); setRuleForm({ priority: rules.length+1, condition_expr: '', next_step_id: '' }); }}
-                      className="px-6 py-2 text-gray-500 hover:text-gray-700 font-medium"
+                      className="px-6 py-2.5 text-[#94A3B8] hover:text-white hover:bg-[#1A1A35] rounded-xl font-medium transition-all"
                     >
                       Cancel
                     </button>
                   )}
-                  <button 
+                  <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.95 }}
                     type="submit"
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-2 rounded-lg font-bold flex items-center gap-2 shadow-sm transition"
+                    className="bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all hover:shadow-[0_0_20px_rgba(99,102,241,0.4)]"
                   >
                     <Save className="w-4 h-4" />
                     {editingRule ? 'Update Rule' : 'Add Rule'}
-                  </button>
+                  </motion.button>
                 </div>
               </form>
             </div>
           </div>
 
+          {/* Language Syntax Panel */}
           <div className="col-span-12 lg:col-span-4">
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-4">
-              <h4 className="font-bold text-gray-900 flex items-center gap-2">
+            <div className="bg-[#141428] border border-[#2D2D5E] rounded-2xl p-6 space-y-4 sticky top-24">
+              <h4 className="font-bold text-white flex items-center gap-2">
                 <Lightbulb className="w-5 h-5 text-amber-400" />
-                Language Syntax
+                💡 Language Syntax
               </h4>
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {[
-                  { op: '== != > <', desc: 'Standard comparisons' },
-                  { op: '&& ||', desc: 'Logical AND/OR' },
-                  { op: 'contains(f, "v")', desc: 'String search' },
-                  { op: 'startsWith(f, "v")', desc: 'Matches start' },
-                  { op: 'DEFAULT', desc: 'Fall-through handler' },
+                  { op: '== != > < >= <=', desc: 'Standard comparisons', color: 'text-indigo-400' },
+                  { op: '&& ||', desc: 'Logical AND/OR', color: 'text-purple-400' },
+                  { op: 'contains(f, "v")', desc: 'String search', color: 'text-green-400' },
+                  { op: 'startsWith(f, "v")', desc: 'Matches start', color: 'text-yellow-400' },
+                  { op: 'endsWith(f, "v")', desc: 'Matches end', color: 'text-yellow-400' },
+                  { op: 'DEFAULT', desc: 'Fall-through handler', color: 'text-orange-400 font-bold' },
                 ].map((item, i) => (
-                  <div key={i} className="flex flex-col p-2 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
-                    <code className="text-xs font-bold text-indigo-600">{item.op}</code>
-                    <span className="text-[11px] text-gray-500 mt-0.5">{item.desc}</span>
+                  <div key={i} className="flex flex-col p-3 bg-[#0A0A14] rounded-xl border border-[#2D2D5E] hover:border-[#3D3D7E] transition">
+                    <code className={`text-xs font-bold font-mono ${item.color}`}>{item.op}</code>
+                    <span className="text-[11px] text-[#64748B] mt-0.5">{item.desc}</span>
                   </div>
                 ))}
               </div>
-              <div className="p-3 bg-blue-50 rounded-xl flex gap-3 text-xs text-blue-700 border border-blue-100">
+              <div className="p-3 bg-blue-500/10 rounded-xl flex gap-3 text-xs text-blue-400 border border-blue-500/20">
                 <Info className="w-4 h-4 shrink-0 mt-0.5" />
                 <p>Rules are evaluated in ascending order of priority. The first match wins.</p>
               </div>
             </div>
           </div>
         </div>
-
-      </div>
+      </motion.div>
     </Layout>
   );
 }

@@ -2,6 +2,42 @@
 @tailwind components;
 @tailwind utilities;
 
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
 body {
-  background-color: #F3F4F6;
+  background-color: #0F0F1A;
+  font-family: 'Inter', sans-serif;
+  color: #FFFFFF;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom scrollbar for dark theme */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0A0A14;
+}
+::-webkit-scrollbar-thumb {
+  background: #2D2D5E;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3D3D7E;
+}
+
+/* Selection color */
+::selection {
+  background-color: rgba(99, 102, 241, 0.3);
+  color: #FFFFFF;
 }

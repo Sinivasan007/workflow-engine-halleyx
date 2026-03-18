@@ -1,32 +1,28 @@
 import React from 'react';
 
-/* ── colour map ────────────────────────────────────────────────────────── */
 const BADGE_MAP = {
-  /* execution / workflow statuses */
-  active:       { bg: 'bg-emerald-100', text: 'text-emerald-700', dot: 'bg-emerald-500' },
-  completed:    { bg: 'bg-emerald-100', text: 'text-emerald-700', dot: 'bg-emerald-500' },
-  in_progress:  { bg: 'bg-blue-100',    text: 'text-blue-700',    dot: 'bg-blue-500', pulse: true },
-  failed:       { bg: 'bg-red-100',      text: 'text-red-700',      dot: 'bg-red-500' },
-  canceled:     { bg: 'bg-gray-100',     text: 'text-gray-600',     dot: 'bg-gray-400' },
-  cancelled:    { bg: 'bg-gray-100',     text: 'text-gray-600',     dot: 'bg-gray-400' },
-  pending:      { bg: 'bg-amber-100',    text: 'text-amber-700',    dot: 'bg-amber-500' },
-  inactive:     { bg: 'bg-gray-100',     text: 'text-gray-600',     dot: 'bg-gray-400' },
+  completed:    { bg: 'bg-green-500/10',   text: 'text-green-400',   border: 'border-green-500/30',  dot: 'bg-green-400' },
+  failed:       { bg: 'bg-red-500/10',     text: 'text-red-400',     border: 'border-red-500/30',    dot: 'bg-red-400' },
+  in_progress:  { bg: 'bg-blue-500/10',    text: 'text-blue-400',    border: 'border-blue-500/30',   dot: 'bg-blue-400', pulse: true },
+  canceled:     { bg: 'bg-gray-500/10',    text: 'text-gray-400',    border: 'border-gray-500/30',   dot: 'bg-gray-400' },
+  cancelled:    { bg: 'bg-gray-500/10',    text: 'text-gray-400',    border: 'border-gray-500/30',   dot: 'bg-gray-400' },
+  pending:      { bg: 'bg-yellow-500/10',  text: 'text-yellow-400',  border: 'border-yellow-500/30', dot: 'bg-yellow-400' },
+  active:       { bg: 'bg-green-500/10',   text: 'text-green-400',   border: 'border-green-500/30',  dot: 'bg-green-400' },
+  inactive:     { bg: 'bg-gray-500/10',    text: 'text-gray-400',    border: 'border-gray-500/30',   dot: 'bg-gray-400' },
 
   /* step types */
-  approval:     { bg: 'bg-blue-100',     text: 'text-blue-700',     dot: 'bg-blue-500' },
-  notification: { bg: 'bg-purple-100',   text: 'text-purple-700',   dot: 'bg-purple-500' },
-  task:         { bg: 'bg-orange-100',   text: 'text-orange-700',   dot: 'bg-orange-500' },
+  approval:     { bg: 'bg-blue-500/10',    text: 'text-blue-400',    border: 'border-blue-500/30',   dot: 'bg-blue-400' },
+  notification: { bg: 'bg-purple-500/10',  text: 'text-purple-400',  border: 'border-purple-500/30', dot: 'bg-purple-400' },
+  task:         { bg: 'bg-orange-500/10',  text: 'text-orange-400',  border: 'border-orange-500/30', dot: 'bg-orange-400' },
 };
 
-const FALLBACK = { bg: 'bg-gray-100', text: 'text-gray-600', dot: 'bg-gray-400' };
+const FALLBACK = { bg: 'bg-gray-500/10', text: 'text-gray-400', border: 'border-gray-500/30', dot: 'bg-gray-400' };
 
-/* ── sizes ─────────────────────────────────────────────────────────────── */
 const SIZE_MAP = {
   sm: 'text-xs px-2 py-0.5',
   md: 'text-xs px-2.5 py-1',
 };
 
-/* ── component ─────────────────────────────────────────────────────────── */
 export default function StatusBadge({ status, size = 'md' }) {
   if (!status) return null;
 
@@ -42,10 +38,9 @@ export default function StatusBadge({ status, size = 'md' }) {
     <span
       className={`
         inline-flex items-center gap-1.5 font-semibold rounded-full whitespace-nowrap
-        ${cfg.bg} ${cfg.text} ${sizeClass}
+        border ${cfg.bg} ${cfg.text} ${cfg.border} ${sizeClass}
       `}
     >
-      {/* dot — animated pulse for in_progress */}
       <span className="relative flex h-2 w-2">
         {cfg.pulse && (
           <span
@@ -54,7 +49,6 @@ export default function StatusBadge({ status, size = 'md' }) {
         )}
         <span className={`relative inline-flex rounded-full h-2 w-2 ${cfg.dot}`} />
       </span>
-
       {label}
     </span>
   );

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { 
+import { motion } from 'framer-motion';
+import {
   Play, CheckCircle2, Clock, ChevronDown, ChevronUp,
   User, ArrowRight, Loader2, Zap, RotateCcw, XCircle,
   Mail, ChevronRight
@@ -8,8 +9,8 @@ import {
 import Layout from '../components/Layout';
 import StatusBadge from '../components/StatusBadge';
 import { useToast } from '../components/Toast';
-import { 
-  getWorkflow, executeWorkflow, getExecution, 
+import {
+  getWorkflow, executeWorkflow, getExecution,
   approveExecution, cancelExecution, retryExecution
 } from '../services/api';
 
@@ -25,26 +26,20 @@ const fmtDuration = (s, e) => {
 };
 
 export default function ExecutionView() {
-  const { id } = useParams(); // Workflow ID or Execution ID
+  const { id } = useParams();
   const navigate = useNavigate();
   const { showToast } = useToast();
-  
+
   const [workflow, setWorkflow] = useState(null);
   const [execution, setExecution] = useState(null);
   const [loading, setLoading] = useState(true);
-  
-  // Section 1: Input Setup
+
   const [inputData, setInputData] = useState({});
-  const [triggeredBy, setTriggeredBy] = useState('user123');
+  const [triggeredBy, setTriggeredBy] = useState('user-sinivasan');
   const [isStarting, setIsStarting] = useState(false);
 
-  // Section 2: Real-time Polling
   const pollRef = useRef(null);
-
-  // Approving state
   const [approving, setApproving] = useState(false);
-
-  // Section 3: Log Accordion
   const [expandedLogs, setExpandedLogs] = useState({});
 
   const toggleLog = (logId) => {
@@ -56,7 +51,6 @@ export default function ExecutionView() {
     try {
       const { data } = await getWorkflow(wid);
       setWorkflow(data);
-      // Initialize input data default values
       const schema = typeof data.input_schema === 'string' ? JSON.parse(data.input_schema) : data.input_schema;
       const initial = {};
       if (schema && typeof schema === 'object') {
@@ -75,7 +69,7 @@ export default function ExecutionView() {
       const { data } = await getExecution(eid);
       setExecution(data);
       if (!workflow) loadWorkflow(data.workflow_id);
-      
+
       const status = data.status;
       if (status === 'in_progress' || status === 'pending') {
         startPolling(eid);
@@ -84,11 +78,10 @@ export default function ExecutionView() {
       }
     } catch { showToast('Failed to load execution', 'error'); }
     finally { setLoading(false); }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workflow?.id, loadWorkflow, showToast]);
 
   useEffect(() => {
-    // If URL is /executions/:id, we load execution. If /workflows/:id/execute, we load workflow.
     const path = window.location.pathname;
     if (path.includes('/executions/')) {
       loadExecution(id);
@@ -130,7 +123,6 @@ export default function ExecutionView() {
   const handleStart = async () => {
     if (!workflow) return;
     const rawSchema = typeof workflow?.input_schema === 'string' ? JSON.parse(workflow.input_schema) : (workflow?.input_schema || {});
-    // Validate required fields using Object.entries (schema is an object, not an array)
     const missingFields = [];
     Object.entries(rawSchema).forEach(([fieldName, fieldConfig]) => {
       if (fieldConfig.required && !inputData[fieldName] && inputData[fieldName] !== 0) {
@@ -158,15 +150,15 @@ export default function ExecutionView() {
     if (!execution?.id) return;
     setApproving(true);
     try {
-      const res = await approveExecution(execution.id, { 
+      const res = await approveExecution(execution.id, {
         status: 'completed',
-        approver_id: approverId || 'user123'
+        approver_id: approverId || 'user-sinivasan'
       });
       showToast('Step approved', 'success');
       setExecution(res.data);
       setApproverId('');
-    } catch (err) { 
-      showToast(err.response?.data?.error || 'Approval failed', 'error'); 
+    } catch (err) {
+      showToast(err.response?.data?.error || 'Approval failed', 'error');
     } finally {
       setApproving(false);
     }
@@ -180,8 +172,8 @@ export default function ExecutionView() {
       const res = await cancelExecution(execution.id);
       showToast('Step rejected & execution canceled', 'warning');
       setExecution(res.data);
-    } catch (err) { 
-      showToast(err.response?.data?.error || 'Rejection failed', 'error'); 
+    } catch (err) {
+      showToast(err.response?.data?.error || 'Rejection failed', 'error');
     } finally {
       setApproving(false);
     }
@@ -193,7 +185,6 @@ export default function ExecutionView() {
       const res = await retryExecution(execution.id);
       showToast('Retry started', 'success');
       setExecution(res.data);
-      // Resume polling in case it continues
       if (res.data?.status === 'in_progress') {
         startPolling(execution.id);
       }
@@ -207,27 +198,28 @@ export default function ExecutionView() {
     setExecution(null);
     setInputData({});
     setTriggeredBy('');
-    // Re-load the workflow to get fresh schema for input form
     loadWorkflow(id);
     navigate(`/workflows/${id}/execute`, { replace: true });
   };
 
-  /* ── Renderers ──────────────────────────────────────────────────────── */
+  /* ── Input Form ──────────────────────────────────────────────────────── */
   const renderInputForm = () => {
     if (!workflow) return null;
     const rawSchema = workflow?.input_schema;
     const schemaObj = typeof rawSchema === 'string' ? JSON.parse(rawSchema) : (rawSchema || {});
-    
-    // input_schema is a JSON object { fieldName: { type, required, allowed_values } }
-    // Convert to array of entries for rendering
     const schemaEntries = Object.entries(schemaObj);
 
     return (
-      <div className="max-w-2xl mx-auto space-y-6 animate-fadeIn">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
-          <h3 className="text-xl font-bold text-gray-900 mb-2">Enter Execution Data</h3>
-          <p className="text-sm text-gray-500 mb-6">Provide the required fields to trigger the workflow engine.</p>
-          
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="max-w-2xl mx-auto space-y-6"
+      >
+        <div className="bg-[#141428] border border-[#2D2D5E] rounded-2xl p-8">
+          <h3 className="text-xl font-bold text-white mb-2">Enter Execution Data</h3>
+          <p className="text-sm text-[#94A3B8] mb-6">Provide the required fields to trigger the workflow engine.</p>
+
           <div className="space-y-5">
             {schemaEntries.map(([fieldName, fieldConfig]) => {
               const isRequired = fieldConfig.required === true;
@@ -236,17 +228,16 @@ export default function ExecutionView() {
 
               return (
                 <div key={fieldName}>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">
+                  <label className="block text-xs font-semibold text-[#94A3B8] uppercase tracking-wider mb-2">
                     {fieldName.charAt(0).toUpperCase() + fieldName.slice(1)}
-                    {isRequired && <span className="text-red-500 ml-1">*</span>}
+                    {isRequired && <span className="text-red-400 ml-1">*</span>}
                   </label>
 
-                  {/* Dropdown if allowed_values exist */}
                   {allowedValues && allowedValues.length > 0 ? (
                     <select
                       value={inputData[fieldName] || ''}
                       onChange={e => setInputData(prev => ({ ...prev, [fieldName]: e.target.value }))}
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      className="w-full bg-[#0A0A14] border border-[#2D2D5E] text-white rounded-xl px-4 py-3 focus:outline-none focus:border-indigo-500 transition-all"
                     >
                       <option value="">Select {fieldName}...</option>
                       {allowedValues.map(val => (
@@ -254,23 +245,23 @@ export default function ExecutionView() {
                       ))}
                     </select>
                   ) : fieldType === 'boolean' ? (
-                    <label className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer">
-                      <input 
+                    <label className="flex items-center gap-3 p-3 bg-[#0A0A14] rounded-xl border border-[#2D2D5E] cursor-pointer hover:border-[#3D3D7E] transition">
+                      <input
                         type="checkbox" checked={inputData[fieldName] || false}
                         onChange={e => setInputData(prev => ({ ...prev, [fieldName]: e.target.checked }))}
-                        className="w-5 h-5 text-indigo-600 rounded"
+                        className="w-5 h-5 rounded text-indigo-600 bg-[#0A0A14] border-[#2D2D5E]"
                       />
-                      <span className="text-sm text-gray-600">Enable this option</span>
+                      <span className="text-sm text-[#94A3B8]">Enable this option</span>
                     </label>
                   ) : (
-                    <input 
+                    <input
                       type={fieldType === 'number' ? 'number' : 'text'}
                       value={inputData[fieldName] || ''}
                       onChange={e => setInputData(prev => ({
                         ...prev,
                         [fieldName]: fieldType === 'number' ? (parseFloat(e.target.value) || '') : e.target.value
                       }))}
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      className="w-full bg-[#0A0A14] border border-[#2D2D5E] text-white rounded-xl px-4 py-3 placeholder-[#64748B] focus:outline-none focus:border-indigo-500 focus:shadow-[0_0_0_3px_rgba(99,102,241,0.1)] transition-all"
                       placeholder={`Enter ${fieldName}...`}
                     />
                   )}
@@ -278,105 +269,123 @@ export default function ExecutionView() {
               );
             })}
 
-            <div className="pt-4 border-t border-gray-50">
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Triggered By (Username)</label>
+            <div className="pt-4 border-t border-[#2D2D5E]">
+              <label className="block text-xs font-semibold text-[#94A3B8] uppercase tracking-wider mb-2">Triggered By</label>
               <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input 
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#64748B]" />
+                <input
                   type="text" value={triggeredBy}
                   onChange={e => setTriggeredBy(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg pl-10 pr-4 py-2 focus:ring-2 focus:ring-indigo-500"
-                  placeholder="e.g. jsmith"
+                  className="w-full bg-[#0A0A14] border border-[#2D2D5E] text-white rounded-xl pl-10 pr-4 py-3 placeholder-[#64748B] focus:outline-none focus:border-indigo-500 transition-all"
+                  placeholder="user-sinivasan"
                 />
               </div>
             </div>
 
-            <button 
+            <motion.button
+              whileHover={{ scale: 1.01 }}
+              whileTap={{ scale: 0.98 }}
               onClick={handleStart}
               disabled={isStarting}
-              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-3 shadow-lg shadow-indigo-100 transition disabled:opacity-50"
+              className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-3 transition-all hover:shadow-[0_0_30px_rgba(99,102,241,0.3)] disabled:opacity-50"
             >
               {isStarting ? <Loader2 className="w-6 h-6 animate-spin" /> : <Play className="w-6 h-6" />}
-              Start Execution
-            </button>
+              {isStarting ? 'Starting...' : 'Start Execution'}
+            </motion.button>
           </div>
         </div>
-      </div>
+      </motion.div>
     );
   };
 
+  /* ── Execution Progress ──────────────────────────────────────────────── */
   const renderProgress = () => {
     if (!execution) return null;
     const ex = execution;
-    // Sort logs by started_at; use original array index as tiebreaker
-    // (auto-complete steps can share the same millisecond timestamp)
     const sortedLogs = (ex?.logs || [])
       .map((log, i) => ({ ...log, _idx: i }))
       .sort((a, b) => new Date(a.started_at) - new Date(b.started_at) || a._idx - b._idx);
-    
-    // Determine current step index
-    const steps = [...(workflow?.steps || [])].sort((a,b) => a.step_order - b.step_order);
+
+    const steps = [...(workflow?.steps || [])].sort((a, b) => a.step_order - b.step_order);
     const currentStepId = ex?.current_step_id;
-    
+
     return (
-      <div className="space-y-8 animate-fadeIn">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="space-y-8"
+      >
         {/* Header Card */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-wrap items-center justify-between gap-4">
+        <div className="bg-[#141428] border border-[#2D2D5E] rounded-2xl p-6 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${ex.status === 'completed' ? 'bg-emerald-500' : ex.status === 'failed' ? 'bg-red-500' : 'bg-blue-500'}`}>
-              {ex.status === 'in_progress' ? <Zap className="w-6 h-6 text-white animate-pulse" /> : <CheckCircle2 className="w-6 h-6 text-white" />}
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${ex.status === 'completed' ? 'bg-green-500/20' :
+                ex.status === 'failed' ? 'bg-red-500/20' :
+                  'bg-indigo-500/20'
+              }`}>
+              {ex.status === 'in_progress'
+                ? <Zap className="w-6 h-6 text-indigo-400 animate-pulse" />
+                : ex.status === 'completed'
+                  ? <CheckCircle2 className="w-6 h-6 text-green-400" />
+                  : <XCircle className="w-6 h-6 text-red-400" />
+              }
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-xl font-bold text-gray-900">Execution {ex.status.replace('_', ' ')}</h2>
+                <h2 className="text-xl font-bold text-white">Execution {ex.status.replace('_', ' ')}</h2>
                 <StatusBadge status={ex.status} size="sm" />
               </div>
-              <p className="text-xs text-gray-400 font-mono mt-0.5">ID: {ex.id}</p>
+              <p className="text-xs text-[#64748B] font-mono mt-0.5">ID: {ex.id}</p>
             </div>
           </div>
           <div className="flex gap-8 text-sm">
-            <div><p className="text-gray-400 font-medium">Started</p><p className="font-bold text-gray-900">{fmtTime(ex.started_at)}</p></div>
-            <div><p className="text-gray-400 font-medium">Duration</p><p className="font-bold text-gray-900">{fmtDuration(ex.started_at, ex.ended_at || new Date())}</p></div>
+            <div><p className="text-[#64748B] font-medium">Started</p><p className="font-bold text-white">{fmtTime(ex.started_at)}</p></div>
+            <div><p className="text-[#64748B] font-medium">Duration</p><p className="font-bold text-white">{fmtDuration(ex.started_at, ex.ended_at || new Date())}</p></div>
           </div>
         </div>
 
         <div className="grid grid-cols-12 gap-8">
-          {/* Tracker */}
-          <div className="col-span-12 lg:col-span-4 bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-6">
-            <h3 className="font-bold text-gray-900 flex items-center gap-2">
-              <Clock className="w-5 h-5 text-indigo-600" /> Step Progress
-            </h3>
-            <div className="relative space-y-0.5 ml-2">
-              {steps.map((s, i) => {
-                const log = sortedLogs.find(l => l.step_id === s.id && l.status !== 'in_progress');
-                const isCurrent = currentStepId === s.id && ex.status === 'in_progress';
-                const isPending = !log && !isCurrent;
-                
-                return (
-                  <React.Fragment key={s.id}>
-                    <div className="flex items-start gap-4">
-                      <div className={`mt-1 w-6 h-6 rounded-full border-2 flex items-center justify-center z-10 ${
-                        log ? 'bg-emerald-500 border-emerald-500' : 
-                        isCurrent ? 'bg-blue-500 border-blue-500 animate-pulse' : 
-                        'bg-white border-gray-200'
-                      }`}>
-                        {log ? <CheckCircle2 className="w-4 h-4 text-white" /> : 
-                         isCurrent ? <Loader2 className="w-4 h-4 text-white animate-spin" /> : 
-                         <div className="w-2 h-2 rounded-full bg-gray-200" />}
+          {/* Step Progress Tracker */}
+          <div className="col-span-12 lg:col-span-4">
+            <div className="bg-[#141428] border border-[#2D2D5E] rounded-2xl p-6 space-y-6 sticky top-24">
+              <h3 className="font-bold text-white flex items-center gap-2">
+                <Clock className="w-5 h-5 text-indigo-400" /> Step Progress
+              </h3>
+              <div className="space-y-0.5 ml-2">
+                {steps.map((s, i) => {
+                  const log = sortedLogs.find(l => l.step_id === s.id && l.status !== 'in_progress');
+                  const isCurrent = currentStepId === s.id && ex.status === 'in_progress';
+                  const isPending = !log && !isCurrent;
+                  const isFailed = sortedLogs.find(l => l.step_id === s.id && l.status === 'failed');
+
+                  return (
+                    <React.Fragment key={s.id}>
+                      <div className="flex items-start gap-4">
+                        <div className={`mt-1 w-7 h-7 rounded-full border-2 flex items-center justify-center z-10 ${isFailed ? 'bg-red-500 border-red-500' :
+                            log ? 'bg-green-500 border-green-500' :
+                              isCurrent ? 'bg-indigo-600 border-indigo-600 shadow-[0_0_15px_rgba(99,102,241,0.4)]' :
+                                'bg-[#1A1A35] border-[#2D2D5E]'
+                          }`}>
+                          {isFailed ? <XCircle className="w-4 h-4 text-white" /> :
+                            log ? <CheckCircle2 className="w-4 h-4 text-white" /> :
+                              isCurrent ? <Loader2 className="w-4 h-4 text-white animate-spin" /> :
+                                <div className="w-2 h-2 rounded-full bg-[#64748B]" />}
+                        </div>
+                        <div className="flex-1 pb-6">
+                          <p className={`text-sm font-bold ${isPending ? 'text-[#64748B]' : 'text-white'}`}>{s.name}</p>
+                          <p className="text-[10px] text-[#64748B] uppercase font-semibold">{s.step_type}</p>
+                          {log && !isFailed && <p className="text-[10px] text-green-400 font-bold mt-1">Completed in {fmtDuration(log.started_at, log.ended_at)}</p>}
+                          {isCurrent && <p className="text-[10px] text-indigo-400 font-bold animate-pulse mt-1">Processing...</p>}
+                          {isPending && <p className="text-[10px] text-[#64748B] mt-1">Waiting...</p>}
+                        </div>
                       </div>
-                      <div className="flex-1 pb-6">
-                        <p className={`text-sm font-bold ${isPending ? 'text-gray-400' : 'text-gray-900'}`}>{s.name}</p>
-                        <p className="text-[10px] text-gray-400 uppercase font-semibold">{s.step_type}</p>
-                        {log && <p className="text-[10px] text-emerald-500 font-bold mt-1">Completed in {fmtDuration(log.started_at, log.ended_at)}</p>}
-                        {isCurrent && <p className="text-[10px] text-blue-500 font-bold animate-pulse mt-1">Processing...</p>}
-                      </div>
-                    </div>
-                    {i < steps.length - 1 && (
-                      <div className={`absolute left-3 top-7 w-0.5 h-full -z-0 ${log ? 'bg-emerald-100' : 'bg-gray-100'}`} style={{ height: 'calc(100% - 32px)' }} />
-                    )}
-                  </React.Fragment>
-                );
-              })}
+                      {i < steps.length - 1 && (
+                        <div className={`ml-3.5 h-4 w-px ${log ? 'bg-green-500/30' : 'bg-[#2D2D5E]'}`} />
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
@@ -386,17 +395,20 @@ export default function ExecutionView() {
             {execution?.status === 'in_progress' && (() => {
               const currentStepLog = execution?.logs?.find(l => l.status === 'in_progress' || l.status === 'pending');
               const isApproval = currentStepLog?.step_type === 'approval';
-              
               if (!isApproval) return null;
 
               return (
-                <div className="bg-indigo-600 rounded-2xl shadow-xl p-8 text-white relative overflow-hidden animate-fadeIn">
-                  <div className="absolute top-0 right-0 p-12 opacity-10"><Mail className="w-32 h-32" /></div>
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.98 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="bg-gradient-to-br from-indigo-900/40 to-purple-900/40 border border-indigo-500/40 rounded-2xl p-8 relative overflow-hidden"
+                >
+                  <div className="absolute top-0 right-0 p-8 opacity-10"><Mail className="w-32 h-32 text-indigo-400" /></div>
                   <div className="relative z-10">
-                    <h3 className="text-xl font-bold mb-4">Action Required</h3>
-                    <div className="p-4 bg-white/10 backdrop-blur rounded-xl border border-white/20 mb-6 space-y-2">
-                      <p className="text-sm font-medium">Waiting for approval at step: <span className="font-bold">{currentStepLog?.step_name}</span></p>
-                      <p className="text-xs opacity-80">
+                    <h3 className="text-xl font-bold text-white mb-4">⚡ Action Required</h3>
+                    <div className="p-4 bg-[#0A0A14]/60 backdrop-blur rounded-xl border border-[#2D2D5E] mb-6 space-y-2">
+                      <p className="text-sm font-medium text-[#94A3B8]">Waiting for approval at step: <span className="font-bold text-white">{currentStepLog?.step_name}</span></p>
+                      <p className="text-xs text-[#64748B]">
                         Assigned to: {(() => {
                           try {
                             const step = workflow?.steps?.find(s => s.id === currentStepLog?.step_id);
@@ -406,155 +418,201 @@ export default function ExecutionView() {
                         })()}
                       </p>
                     </div>
-                    
+
                     <div className="flex flex-col sm:flex-row items-end gap-3">
                       <div className="w-full sm:w-48">
-                        <label className="block text-[10px] font-bold uppercase tracking-widest opacity-70 mb-1">Your ID (Optional)</label>
-                        <input 
+                        <label className="block text-[10px] font-bold uppercase tracking-widest text-[#64748B] mb-1">Your ID (Optional)</label>
+                        <input
                           type="text" value={approverId} onChange={e => setApproverId(e.target.value)}
-                          className="w-full bg-white/20 border-transparent focus:bg-white/30 rounded-lg px-3 py-2 text-sm placeholder:text-white/40"
+                          className="w-full bg-[#0A0A14] border border-[#2D2D5E] text-white rounded-xl px-3 py-2.5 text-sm placeholder-[#64748B] focus:outline-none focus:border-indigo-500 transition-all"
                           placeholder="mgr_456"
                         />
                       </div>
                       <div className="flex gap-2 w-full sm:w-auto">
-                        <button 
-                          onClick={handleApprove} 
-                          disabled={approving}
-                          className="flex-1 sm:flex-none bg-emerald-400 hover:bg-emerald-500 text-emerald-900 font-bold px-6 py-2 rounded-lg transition shadow-lg disabled:opacity-50"
+                        <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.95 }}
+                          onClick={handleApprove} disabled={approving}
+                          className="flex-1 sm:flex-none bg-indigo-600 hover:bg-green-600 text-white font-bold px-6 py-2.5 rounded-xl transition-all disabled:opacity-50 hover:shadow-[0_0_20px_rgba(16,185,129,0.3)]"
                         >
                           {approving ? '...' : '✅ Approve'}
-                        </button>
-                        <button 
-                          onClick={handleReject} 
-                          disabled={approving}
-                          className="flex-1 sm:flex-none bg-red-400 hover:bg-red-500 text-red-900 font-bold px-6 py-2 rounded-lg transition shadow-lg disabled:opacity-50"
+                        </motion.button>
+                        <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.95 }}
+                          onClick={handleReject} disabled={approving}
+                          className="flex-1 sm:flex-none bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 font-bold px-6 py-2.5 rounded-xl transition-all disabled:opacity-50"
                         >
-                          {approving ? '...' : '❌ Reject'}
-                        </button>
+                          {approving ? '...' : '✗ Reject'}
+                        </motion.button>
                       </div>
                     </div>
                   </div>
-                </div>
+                </motion.div>
               );
             })()}
 
             {/* Terminal Status Cards */}
             {execution?.status === 'completed' && (
-              <div className="bg-emerald-50 border-2 border-emerald-200 rounded-2xl p-8 text-center animate-fadeIn">
+              <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+                className="bg-green-500/10 border border-green-500/30 rounded-2xl p-8 text-center"
+              >
                 <div className="text-5xl mb-3">🎉</div>
-                <h3 className="text-emerald-700 text-2xl font-bold">Workflow Completed!</h3>
-                <p className="text-emerald-600 mt-2">All steps finished successfully in {fmtDuration(execution.started_at, execution.ended_at)}</p>
+                <h3 className="text-green-400 text-2xl font-bold">Workflow Completed Successfully!</h3>
+                <p className="text-green-400/70 mt-2">All steps finished in {fmtDuration(execution.started_at, execution.ended_at)}</p>
                 <div className="mt-6 flex justify-center gap-3">
-                  <button onClick={() => navigate('/audit')} className="bg-white border border-emerald-200 text-emerald-700 font-bold px-6 py-2 rounded-xl hover:bg-emerald-100 transition flex items-center gap-2">
-                    📋 View Audit Log
-                  </button>
-                  <button onClick={handleExecuteAgain} className="bg-emerald-600 text-white font-bold px-6 py-2 rounded-xl hover:bg-emerald-700 transition flex items-center gap-2 shadow-lg">
+                  <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.95 }}
+                    onClick={() => navigate('/audit')}
+                    className="bg-[#141428] border border-[#2D2D5E] text-[#94A3B8] hover:text-white font-bold px-6 py-2.5 rounded-xl transition-all flex items-center gap-2"
+                  >
+                    📋 Audit Log
+                  </motion.button>
+                  <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.95 }}
+                    onClick={handleExecuteAgain}
+                    className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-6 py-2.5 rounded-xl transition-all flex items-center gap-2 hover:shadow-[0_0_20px_rgba(99,102,241,0.4)]"
+                  >
                     <Play className="w-4 h-4" /> Execute Again
-                  </button>
+                  </motion.button>
                 </div>
-              </div>
+              </motion.div>
             )}
 
             {execution?.status === 'canceled' && (
-              <div className="bg-gray-50 border-2 border-gray-200 rounded-2xl p-8 text-center animate-fadeIn">
+              <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+                className="bg-gray-500/10 border border-gray-500/30 rounded-2xl p-8 text-center"
+              >
                 <div className="text-5xl mb-3">⛔</div>
-                <h3 className="text-gray-700 text-2xl font-bold">Execution Canceled</h3>
-                <p className="text-gray-500 mt-2">This workflow was terminated before completion.</p>
-                <div className="mt-6 flex justify-center gap-3">
-                  <button onClick={handleExecuteAgain} className="bg-indigo-600 text-white font-bold px-6 py-2 rounded-xl hover:bg-indigo-700 transition flex items-center gap-2 shadow-lg">
+                <h3 className="text-gray-400 text-2xl font-bold">Execution Canceled</h3>
+                <p className="text-[#64748B] mt-2">This workflow was terminated before completion.</p>
+                <div className="mt-6 flex justify-center">
+                  <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.95 }}
+                    onClick={handleExecuteAgain}
+                    className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-6 py-2.5 rounded-xl transition-all flex items-center gap-2 hover:shadow-[0_0_20px_rgba(99,102,241,0.4)]"
+                  >
                     <Play className="w-4 h-4" /> Execute Again
-                  </button>
+                  </motion.button>
                 </div>
-              </div>
+              </motion.div>
             )}
 
             {execution?.status === 'failed' && (
-              <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-8 text-center animate-fadeIn">
+              <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+                className="bg-red-500/10 border border-red-500/30 rounded-2xl p-8 text-center"
+              >
                 <div className="text-5xl mb-3">❌</div>
-                <h3 className="text-red-700 text-2xl font-bold">Execution Failed</h3>
-                <p className="text-red-600 mt-2 max-w-md mx-auto">{execution.error_message || 'An error occurred during execution.'}</p>
+                <h3 className="text-red-400 text-2xl font-bold">Execution Failed</h3>
+                <p className="text-red-400/70 mt-2 max-w-md mx-auto">{execution.error_message || 'An error occurred during execution.'}</p>
                 <div className="mt-6 flex justify-center gap-3">
-                  <button onClick={handleRetry} className="bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-3 rounded-xl transition flex items-center gap-2 shadow-lg">
+                  <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.95 }}
+                    onClick={handleRetry}
+                    className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 font-bold px-6 py-3 rounded-xl transition-all flex items-center gap-2"
+                  >
                     <RotateCcw className="w-5 h-5" /> Retry Failed Step
-                  </button>
-                  <button onClick={handleExecuteAgain} className="bg-indigo-600 text-white font-bold px-6 py-3 rounded-xl hover:bg-indigo-700 transition flex items-center gap-2 shadow-lg">
+                  </motion.button>
+                  <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.95 }}
+                    onClick={handleExecuteAgain}
+                    className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-6 py-3 rounded-xl transition-all flex items-center gap-2 hover:shadow-[0_0_20px_rgba(99,102,241,0.4)]"
+                  >
                     <Play className="w-4 h-4" /> Execute Again
-                  </button>
+                  </motion.button>
                 </div>
-              </div>
+              </motion.div>
             )}
 
-            {/* Logs List */}
+            {/* Execution Logs */}
             <div className="space-y-4">
-              <h3 className="font-bold text-gray-900 ml-1">Execution Logs</h3>
-              <div className="space-y-3">
+              <h3 className="font-bold text-white text-lg ml-1">📋 Execution Logs</h3>
+              <div className="space-y-2">
                 {sortedLogs.map((log, idx) => (
-                  <div key={log.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                    <button 
+                  <motion.div
+                    key={log.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.05 }}
+                    className="bg-[#141428] border border-[#2D2D5E] rounded-xl overflow-hidden"
+                  >
+                    <button
                       onClick={() => toggleLog(log.id)}
-                      className="w-full px-5 py-4 flex items-center justify-between hover:bg-gray-50 transition"
+                      className="w-full px-5 py-4 flex items-center justify-between hover:bg-[#1A1A35] transition-all"
                     >
                       <div className="flex items-center gap-4">
-                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${log.status === 'failed' ? 'bg-red-100 text-red-600' : 'bg-indigo-50 text-indigo-600'}`}>
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${log.status === 'failed' ? 'bg-red-500/20 text-red-400' : 'bg-indigo-500/20 text-indigo-400'
+                          }`}>
                           <span className="text-xs font-bold">{idx + 1}</span>
                         </div>
                         <div className="text-left">
-                          <p className="text-sm font-bold text-gray-900">{log.step_name}</p>
-                          <p className="text-[10px] text-gray-400 font-medium uppercase">{log.step_type} • {fmtDuration(log.started_at, log.ended_at)}</p>
+                          <p className="text-sm font-bold text-white">{log.step_name}</p>
+                          <p className="text-[10px] text-[#64748B] font-medium uppercase">{log.step_type} • {fmtDuration(log.started_at, log.ended_at)}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
                         <StatusBadge status={log.status} size="sm" />
-                        {expandedLogs[log.id] ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+                        {expandedLogs[log.id] ? <ChevronUp className="w-4 h-4 text-[#64748B]" /> : <ChevronDown className="w-4 h-4 text-[#64748B]" />}
                       </div>
                     </button>
-                    
+
                     {expandedLogs[log.id] && (
-                      <div className="px-5 pb-5 pt-2 border-t border-gray-50 bg-gray-50/30">
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        className="px-5 pb-5 pt-2 border-t border-[#2D2D5E] bg-[#0A0A14]"
+                      >
                         <div className="space-y-4">
                           <div>
-                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Rules Evaluated</p>
+                            <p className="text-[10px] font-bold text-[#64748B] uppercase tracking-widest mb-3">Rules Evaluated</p>
                             <div className="space-y-2">
                               {log.evaluated_rules?.map((r, ri) => (
-                                <div key={ri} className={`flex items-start gap-3 p-2 rounded-lg border ${r.result ? 'bg-emerald-50 border-emerald-100 text-emerald-800' : 'bg-gray-50 border-gray-100 text-gray-500'}`}>
-                                  {r.result ? <CheckCircle2 className="w-3.5 h-3.5 mt-0.5 shrink-0" /> : <XCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />}
-                                  <code className="text-xs font-mono flex-1 break-all">{r.rule}</code>
-                                  <span className="text-[10px] font-bold uppercase">{r.result ? 'Match' : 'False'}</span>
+                                <div key={ri} className={`flex items-start gap-3 p-3 rounded-lg border ${r.result
+                                    ? 'bg-green-500/10 border-green-500/30'
+                                    : 'bg-red-500/10 border-red-500/30'
+                                  }`}>
+                                  {r.result
+                                    ? <span className="bg-green-500/20 text-green-400 border border-green-500/30 text-[10px] font-bold px-2 py-0.5 rounded-full">MATCH</span>
+                                    : <span className="bg-red-500/20 text-red-400 border border-red-500/30 text-[10px] font-bold px-2 py-0.5 rounded-full">FALSE</span>
+                                  }
+                                  <code className="text-xs font-mono text-[#94A3B8] flex-1 break-all">{r.rule}</code>
+                                  <span className="text-[10px] font-bold text-[#64748B]">P{r.priority || ri + 1}</span>
                                 </div>
                               ))}
-                              {(!log.evaluated_rules || log.evaluated_rules.length === 0) && <p className="text-xs text-gray-400 italic py-2">No rules evaluated for this step type.</p>}
+                              {(!log.evaluated_rules || log.evaluated_rules.length === 0) && <p className="text-xs text-[#64748B] italic py-2">No rules evaluated for this step type.</p>}
                             </div>
                           </div>
-                          <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-100 text-[11px]">
-                            <div><p className="text-gray-400 font-bold uppercase mb-1">Duration</p><p className="text-gray-900 font-mono">{fmtDuration(log.started_at, log.ended_at)}</p></div>
-                            <div><p className="text-gray-400 font-bold uppercase mb-1">Completed At</p><p className="text-gray-900 font-mono">{fmtTime(log.ended_at)}</p></div>
-                            {log.selected_next_step && <div className="col-span-2"><p className="text-gray-400 font-bold uppercase mb-1">Selected Next Path</p><div className="flex items-center gap-2 text-indigo-600 font-bold"><ArrowRight className="w-3 h-3" /> {log.selected_next_step}</div></div>}
-                            {log.error_message && <div className="col-span-2"><p className="text-red-400 font-bold uppercase mb-1">Error Message</p><p className="text-red-700 bg-red-50 p-2 rounded-lg border border-red-100 italic">{log.error_message}</p></div>}
+                          <div className="grid grid-cols-2 gap-4 pt-4 border-t border-[#2D2D5E] text-[11px]">
+                            <div><p className="text-[#64748B] font-bold uppercase mb-1">Duration</p><p className="text-white font-mono">{fmtDuration(log.started_at, log.ended_at)}</p></div>
+                            <div><p className="text-[#64748B] font-bold uppercase mb-1">Completed At</p><p className="text-white font-mono">{fmtTime(log.ended_at)}</p></div>
+                            {log.selected_next_step && <div className="col-span-2"><p className="text-[#64748B] font-bold uppercase mb-1">Selected Next Path</p><div className="flex items-center gap-2 text-indigo-400 font-bold"><ArrowRight className="w-3 h-3" /> {log.selected_next_step}</div></div>}
+                            {log.error_message && <div className="col-span-2"><p className="text-red-400 font-bold uppercase mb-1">Error</p><p className="text-red-400/80 bg-red-500/10 p-2 rounded-lg border border-red-500/30 italic">{log.error_message}</p></div>}
                           </div>
                         </div>
-                      </div>
+                      </motion.div>
                     )}
-                  </div>
+                  </motion.div>
                 ))}
               </div>
             </div>
           </div>
         </div>
-
-
-      </div>
+      </motion.div>
     );
   };
 
-  if (loading) return <Layout title="Loading Execution..."><div className="animate-pulse space-y-6"><div className="h-40 bg-gray-100 rounded-2xl"/><div className="h-64 bg-gray-100 rounded-2xl"/></div></Layout>;
+  if (loading) return (
+    <Layout title="Loading Execution...">
+      <div className="animate-pulse space-y-6">
+        <div className="h-40 bg-[#1A1A35] rounded-2xl" />
+        <div className="h-64 bg-[#1A1A35] rounded-2xl" />
+      </div>
+    </Layout>
+  );
 
   if (!workflow && !execution) {
     return (
       <Layout title="Execute Workflow">
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
-            <p className="text-gray-500 text-lg">Workflow not found</p>
-            <button onClick={() => navigate('/workflows')} className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition">Back to Workflows</button>
+            <p className="text-[#94A3B8] text-lg">Workflow not found</p>
+            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.95 }}
+              onClick={() => navigate('/workflows')}
+              className="mt-4 px-4 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-500 transition-all"
+            >
+              Back to Workflows
+            </motion.button>
           </div>
         </div>
       </Layout>
@@ -565,25 +623,20 @@ export default function ExecutionView() {
     <Layout title={execution ? 'Execution Detail' : 'Execute Workflow'}>
       <div className="max-w-6xl mx-auto pb-12">
         {/* Breadcrumb Context */}
-        <div className="flex items-center gap-2 text-xs text-gray-500 mb-6 px-1">
-          <span className="cursor-pointer hover:text-indigo-600" onClick={() => navigate('/workflows')}>Workflows</span>
+        <div className="flex items-center gap-2 text-xs text-[#64748B] mb-6 px-1">
+          <span className="cursor-pointer hover:text-indigo-400 transition" onClick={() => navigate('/workflows')}>Workflows</span>
           <ChevronRight className="w-3 h-3" />
-          <span className="font-bold text-gray-900">{workflow?.name || 'Loading...'}</span>
+          <span className="font-bold text-white">{workflow?.name || 'Loading...'}</span>
           {execution && (
             <>
               <ChevronRight className="w-3 h-3" />
-              <span className="text-gray-400 font-mono">{execution?.id?.substring(0,8)}</span>
+              <span className="text-[#64748B] font-mono">{execution?.id?.substring(0, 8)}</span>
             </>
           )}
         </div>
 
         {!execution ? renderInputForm() : renderProgress()}
       </div>
-      
-      <style>{`
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .animate-fadeIn { animation: fadeIn 0.4s ease-out; }
-      `}</style>
     </Layout>
   );
 }

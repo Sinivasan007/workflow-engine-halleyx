@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { 
   ClipboardList, Search, RefreshCw, Eye, 
-  RotateCcw, XCircle, ChevronLeft, ChevronRight
+  RotateCcw, XCircle, ChevronLeft, ChevronRight,
+  Activity, CheckCircle2, AlertCircle, Loader2
 } from 'lucide-react';
 import Layout from '../components/Layout';
 import StatusBadge from '../components/StatusBadge';
@@ -22,6 +24,13 @@ const fmtDur = (s, e) => {
   if (diff < 60) return `${diff}s`;
   return `${Math.floor(diff / 60)}m ${diff % 60}s`;
 };
+
+const statConfig = [
+  { key: 'total', label: 'Total', icon: Activity, color: 'text-indigo-400', bg: 'bg-indigo-500/10', border: 'border-indigo-500/30' },
+  { key: 'completed', label: 'Completed', icon: CheckCircle2, color: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/30' },
+  { key: 'failed', label: 'Failed', icon: AlertCircle, color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/30' },
+  { key: 'in_progress', label: 'In Progress', icon: Loader2, color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/30' },
+];
 
 export default function AuditLog() {
   const navigate = useNavigate();
@@ -47,7 +56,6 @@ export default function AuditLog() {
       setExecutions(list);
       setTotalPages(data.pagination?.totalPages || 1);
       
-      // Compute stats — use backend total for 'total' count
       if (Array.isArray(list)) {
         const s = { total: data.pagination?.total || list.length, completed: 0, failed: 0, in_progress: 0 };
         list.forEach(ex => {
@@ -93,98 +101,115 @@ export default function AuditLog() {
 
   return (
     <Layout title="Audit Log">
-      <div className="space-y-6">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="space-y-6"
+      >
         
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Audit Log</h2>
-            <p className="text-gray-500 text-sm mt-1">Track all workflow execution history</p>
+            <h2 className="text-2xl font-bold text-white">Audit Log</h2>
+            <p className="text-[#94A3B8] text-sm mt-1">Track all workflow execution history</p>
           </div>
-          <button 
+          <motion.button whileHover={{ rotate: 180 }} transition={{ duration: 0.3 }}
             onClick={fetchExecutions}
-            className="p-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition text-gray-500"
+            className="p-2.5 bg-[#141428] border border-[#2D2D5E] rounded-xl hover:border-[#3D3D7E] transition text-[#64748B] hover:text-white"
           >
             <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
-          </button>
+          </motion.button>
         </div>
 
         {/* Stats Row */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {[
-            { label: 'Total', value: stats.total, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-            { label: 'Completed', value: stats.completed, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-            { label: 'Failed', value: stats.failed, color: 'text-red-600', bg: 'bg-red-50' },
-            { label: 'In Progress', value: stats.in_progress, color: 'text-blue-600', bg: 'bg-blue-50' }
-          ].map((s, i) => (
-            <div key={i} className={`p-4 rounded-xl border border-gray-100 ${s.bg}`}>
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">{s.label}</p>
-              <p className={`text-2xl font-black mt-1 ${s.color}`}>{s.value}</p>
-            </div>
+          {statConfig.map((s, i) => (
+            <motion.div 
+              key={s.key}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.1 }}
+              className={`p-4 ${s.bg} rounded-xl border ${s.border}`}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-bold text-[#64748B] uppercase tracking-widest">{s.label}</p>
+                <s.icon className={`w-4 h-4 ${s.color}`} />
+              </div>
+              <p className={`text-2xl font-black mt-1 ${s.color}`}>{stats[s.key]}</p>
+            </motion.div>
           ))}
         </div>
 
         {/* Filter Bar */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex flex-col sm:flex-row gap-4 items-center">
+        <div className="bg-[#141428] border border-[#2D2D5E] rounded-2xl p-4 flex flex-col sm:flex-row gap-4 items-center">
           <div className="relative flex-1 w-full">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#64748B]" />
             <input 
               type="text" value={search} onChange={e => setSearch(e.target.value)}
               placeholder="Search workflow name..."
-              className="w-full border border-gray-300 rounded-lg pl-10 pr-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500"
+              className="w-full bg-[#0A0A14] border border-[#2D2D5E] text-white rounded-xl pl-10 pr-4 py-2.5 text-sm placeholder-[#64748B] focus:outline-none focus:border-indigo-500 transition-all"
             />
           </div>
           <div className="flex items-center gap-3 w-full sm:w-auto">
             <select 
               value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 flex-1 sm:flex-none"
+              className="bg-[#0A0A14] border border-[#2D2D5E] text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500 transition-all flex-1 sm:flex-none appearance-none cursor-pointer"
             >
               <option value="">All Statuses</option>
-              <option value="completed">Completed</option>
-              <option value="failed">Failed</option>
-              <option value="in_progress">In Progress</option>
-              <option value="canceled">Canceled</option>
+              <option value="completed">✅ Completed</option>
+              <option value="failed">❌ Failed</option>
+              <option value="in_progress">⏳ In Progress</option>
+              <option value="canceled">⛔ Canceled</option>
             </select>
           </div>
         </div>
 
         {/* Table */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="bg-[#141428] border border-[#2D2D5E] rounded-2xl overflow-hidden">
           <div className="overflow-x-auto w-full">
             <table className="w-full min-w-[1000px] text-sm">
-              <thead className="bg-gray-50 border-b border-gray-100">
-                <tr className="text-left text-xs font-bold text-gray-400 uppercase tracking-widest">
-                  <th className="px-6 py-4">Exec ID</th>
-                  <th className="px-6 py-4">Workflow</th>
-                  <th className="px-6 py-4">Ver</th>
-                  <th className="px-6 py-4">Status</th>
-                  <th className="px-6 py-4">Started By</th>
-                  <th className="px-6 py-4 whitespace-nowrap">Start Time</th>
-                  <th className="px-6 py-4 whitespace-nowrap">Duration</th>
-                  <th className="px-6 py-4 text-right">Actions</th>
+              <thead>
+                <tr className="bg-[#0A0A14] border-b border-[#2D2D5E]">
+                  {['Exec ID', 'Workflow', 'Ver', 'Status', 'Started By', 'Start Time', 'Duration', 'Actions'].map(h => (
+                    <th key={h} className={`px-6 py-4 text-[#64748B] text-xs uppercase tracking-wider font-medium ${h === 'Actions' ? 'text-right' : 'text-left'}`}>{h}</th>
+                  ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-50">
+              <tbody>
                 {loading ? (
                   [...Array(5)].map((_, i) => (
-                    <tr key={i} className="animate-pulse">
-                      <td colSpan="8" className="px-6 py-4"><div className="h-4 bg-gray-100 rounded w-full" /></td>
+                    <tr key={i} className="animate-pulse border-b border-[#1A1A35]">
+                      <td colSpan="8" className="px-6 py-5"><div className="h-4 bg-[#1A1A35] rounded w-full" /></td>
                     </tr>
                   ))
-                ) : executions.map((ex) => (
-                  <tr key={ex.id} className="hover:bg-gray-50 transition-colors group">
-                    <td className="px-6 py-4 font-mono text-[10px] text-gray-400">{ex.id.substring(0,8)}</td>
-                    <td className="px-6 py-4 font-bold text-gray-900">{ex.workflow_name || 'Workflow'}</td>
-                    <td className="px-6 py-4"><span className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded font-bold">v{ex.workflow_version || 1}</span></td>
+                ) : executions.map((ex, index) => (
+                  <motion.tr 
+                    key={ex.id}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.03 }}
+                    className="group border-b border-[#1A1A35] hover:bg-[#1A1A35] transition-colors cursor-pointer"
+                    onClick={() => navigate(`/executions/${ex.id}`)}
+                  >
+                    <td className="px-6 py-4">
+                      <span className="bg-[#0A0A14] border border-[#2D2D5E] px-2 py-1 rounded-lg font-mono text-[10px] text-[#64748B]">
+                        {ex.id.substring(0,8)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 font-bold text-white">{ex.workflow_name || 'Workflow'}</td>
+                    <td className="px-6 py-4">
+                      <span className="text-[10px] px-2 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 rounded-full font-bold">v{ex.workflow_version || 1}</span>
+                    </td>
                     <td className="px-6 py-4"><StatusBadge status={ex.status} size="sm" /></td>
-                    <td className="px-6 py-4 text-gray-500">{ex.triggered_by || 'system'}</td>
-                    <td className="px-6 py-4 text-gray-500 whitespace-nowrap">{fmt(ex.started_at)}</td>
-                    <td className="px-6 py-4 text-gray-400 font-mono text-[11px]">{fmtDur(ex.started_at, ex.ended_at)}</td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-6 py-4 text-[#94A3B8]">{ex.triggered_by || 'system'}</td>
+                    <td className="px-6 py-4 text-[#94A3B8] whitespace-nowrap">{fmt(ex.started_at)}</td>
+                    <td className="px-6 py-4 text-[#64748B] font-mono text-xs">{fmtDur(ex.started_at, ex.ended_at)}</td>
+                    <td className="px-6 py-4 text-right" onClick={e => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-1">
                         <button 
                           onClick={() => navigate(`/executions/${ex.id}`)}
-                          className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition"
+                          className="p-1.5 text-indigo-400 hover:bg-indigo-500/10 rounded-lg transition"
                           title="View Details"
                         >
                           <Eye className="w-4 h-4" />
@@ -192,7 +217,7 @@ export default function AuditLog() {
                         {ex.status === 'failed' && (
                           <button 
                             onClick={() => handleRetry(ex.id)}
-                            className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition"
+                            className="p-1.5 text-green-400 hover:bg-green-500/10 rounded-lg transition"
                             title="Retry"
                           >
                             <RotateCcw className="w-4 h-4" />
@@ -201,7 +226,7 @@ export default function AuditLog() {
                         {ex.status === 'in_progress' && (
                           <button 
                             onClick={() => handleCancel(ex.id)}
-                            className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition"
+                            className="p-1.5 text-red-400 hover:bg-red-500/10 rounded-lg transition"
                             title="Cancel"
                           >
                             <XCircle className="w-4 h-4" />
@@ -209,15 +234,15 @@ export default function AuditLog() {
                         )}
                       </div>
                     </td>
-                  </tr>
+                  </motion.tr>
                 ))}
                 {!loading && executions.length === 0 && (
                   <tr>
                     <td colSpan="8" className="py-20 text-center">
-                      <div className="flex flex-col items-center justify-center text-gray-400">
-                        <ClipboardList className="w-12 h-12 mb-3 opacity-20" />
-                        <p className="font-bold text-lg text-gray-600">No execution records</p>
-                        <p className="text-sm">Start a workflow to see history here.</p>
+                      <div className="flex flex-col items-center justify-center">
+                        <ClipboardList className="w-16 h-16 mb-3 text-[#2D2D5E]" />
+                        <p className="font-bold text-lg text-white">No execution records</p>
+                        <p className="text-sm text-[#64748B] mt-1">Start a workflow to see history here.</p>
                       </div>
                     </td>
                   </tr>
@@ -229,24 +254,38 @@ export default function AuditLog() {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between pt-4">
-            <button 
+          <div className="flex items-center justify-between pt-2">
+            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.95 }}
               disabled={page === 1} onClick={() => setPage(p => p - 1)}
-              className="flex items-center gap-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition disabled:opacity-40"
+              className="flex items-center gap-1 px-4 py-2.5 bg-[#0A0A14] border border-[#2D2D5E] rounded-xl text-sm font-medium text-[#94A3B8] hover:text-white hover:border-[#3D3D7E] transition-all disabled:opacity-40"
             >
               <ChevronLeft className="w-4 h-4" /> Previous
-            </button>
-            <span className="text-sm font-bold text-gray-500">Page {page} of {totalPages}</span>
-            <button 
+            </motion.button>
+            <div className="flex items-center gap-2">
+              {[...Array(totalPages)].map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setPage(i + 1)}
+                  className={`w-8 h-8 rounded-lg text-sm font-bold transition-all ${
+                    page === i + 1
+                      ? 'bg-indigo-600 text-white shadow-[0_0_12px_rgba(99,102,241,0.4)]'
+                      : 'text-[#64748B] hover:bg-[#1A1A35] hover:text-white'
+                  }`}
+                >
+                  {i + 1}
+                </button>
+              ))}
+            </div>
+            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.95 }}
               disabled={page === totalPages} onClick={() => setPage(p => p + 1)}
-              className="flex items-center gap-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition disabled:opacity-40"
+              className="flex items-center gap-1 px-4 py-2.5 bg-[#0A0A14] border border-[#2D2D5E] rounded-xl text-sm font-medium text-[#94A3B8] hover:text-white hover:border-[#3D3D7E] transition-all disabled:opacity-40"
             >
               Next <ChevronRight className="w-4 h-4" />
-            </button>
+            </motion.button>
           </div>
         )}
 
-      </div>
+      </motion.div>
     </Layout>
   );
 }

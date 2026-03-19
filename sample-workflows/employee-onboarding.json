@@ -1,0 +1,126 @@
+{
+  "_comment": "Halleyx Workflow Engine — Sample Workflow: Employee Onboarding",
+  "_expected_path": "HR Notification → Manager Approval → Welcome Email → Onboarding Complete",
+
+  "workflow": {
+    "name": "Employee Onboarding Workflow",
+    "description": "Automates the new employee onboarding process with conditional routing based on role level and salary.",
+    "is_active": true,
+    "input_schema": {
+      "fields": [
+        { "name": "employee_name", "type": "string", "required": true },
+        { "name": "department", "type": "string", "required": true, "allowed_values": ["HR", "IT", "Finance", "Marketing", "Engineering"] },
+        { "name": "salary", "type": "number", "required": true },
+        { "name": "role_level", "type": "string", "required": true, "allowed_values": ["Junior", "Senior", "Manager", "Director"] }
+      ]
+    }
+  },
+
+  "steps": [
+    {
+      "name": "HR Notification",
+      "step_type": "notification",
+      "step_order": 1,
+      "metadata": {
+        "email": "hr@company.com",
+        "channel": "email",
+        "template": "New employee {{employee_name}} joining {{department}} department as {{role_level}}. Salary: ${{salary}}."
+      }
+    },
+    {
+      "name": "IT Setup",
+      "step_type": "task",
+      "step_order": 2,
+      "metadata": {
+        "action": "create_accounts",
+        "description": "Create email, Slack, and system accounts for new employee"
+      }
+    },
+    {
+      "name": "Manager Approval",
+      "step_type": "approval",
+      "step_order": 3,
+      "metadata": {
+        "assignee_email": "manager@company.com",
+        "description": "Manager approves onboarding for senior/director level"
+      }
+    },
+    {
+      "name": "Welcome Email",
+      "step_type": "notification",
+      "step_order": 4,
+      "metadata": {
+        "email": "{{employee_name}}@company.com",
+        "channel": "email",
+        "template": "Welcome to the team, {{employee_name}}! Your accounts are ready. Department: {{department}}."
+      }
+    },
+    {
+      "name": "Onboarding Complete",
+      "step_type": "task",
+      "step_order": 5,
+      "metadata": {
+        "action": "mark_onboarding_complete",
+        "description": "Employee onboarding process completed successfully"
+      }
+    }
+  ],
+
+  "rules": {
+    "HR Notification": [
+      {
+        "priority": 1,
+        "condition_expr": "salary > 50000 && role_level == 'Director'",
+        "next_step": "Manager Approval"
+      },
+      {
+        "priority": 2,
+        "condition_expr": "department == 'IT'",
+        "next_step": "IT Setup"
+      },
+      {
+        "priority": 3,
+        "condition_expr": "DEFAULT",
+        "next_step": "IT Setup"
+      }
+    ],
+    "IT Setup": [
+      {
+        "priority": 1,
+        "condition_expr": "DEFAULT",
+        "next_step": "Welcome Email"
+      }
+    ],
+    "Manager Approval": [
+      {
+        "priority": 1,
+        "condition_expr": "DEFAULT",
+        "next_step": "Welcome Email"
+      }
+    ],
+    "Welcome Email": [
+      {
+        "priority": 1,
+        "condition_expr": "DEFAULT",
+        "next_step": "Onboarding Complete"
+      }
+    ],
+    "Onboarding Complete": []
+  },
+
+  "sample_execution": {
+    "triggered_by": "sinivasan",
+    "input_data": {
+      "employee_name": "John Smith",
+      "department": "Finance",
+      "salary": 75000,
+      "role_level": "Director"
+    },
+    "expected_path": [
+      "HR Notification (notification) → Rule: salary > 50000 && role_level == 'Director' ✅",
+      "Manager Approval (approval) → Awaits manager decision",
+      "Welcome Email (notification) → Sends welcome to John Smith",
+      "Onboarding Complete (task) → Workflow COMPLETED ✅"
+    ]
+  }
+}

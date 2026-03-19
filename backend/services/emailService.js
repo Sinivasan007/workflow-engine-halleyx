@@ -110,7 +110,7 @@ async function sendApprovalEmail({ to, workflowName, stepName, triggeredBy, inpu
     html,
   });
 
-  console.log(`[emailService] Approval email sent to ${to} — messageId: ${info.messageId}`);
+
   return info;
 }
 

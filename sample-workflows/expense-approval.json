@@ -1,0 +1,114 @@
+{
+  "_comment": "Halleyx Workflow Engine — Sample Workflow: Expense Approval",
+  "_expected_path": "Manager Approval → Finance Notification → CEO Approval → Task Completion",
+
+  "workflow": {
+    "name": "Expense Approval Workflow",
+    "description": "Routes expense requests through appropriate approval chains based on amount, country, and priority level.",
+    "is_active": true,
+    "input_schema": {
+      "fields": [
+        { "name": "amount", "type": "number", "required": true },
+        { "name": "country", "type": "string", "required": true, "allowed_values": ["US", "UK", "IN", "CA", "AU"] },
+        { "name": "department", "type": "string", "required": false },
+        { "name": "priority", "type": "string", "required": true, "allowed_values": ["High", "Medium", "Low"] }
+      ]
+    }
+  },
+
+  "steps": [
+    {
+      "name": "Manager Approval",
+      "step_type": "approval",
+      "step_order": 1,
+      "metadata": {
+        "assignee_email": "manager@company.com",
+        "description": "Manager reviews the expense request"
+      }
+    },
+    {
+      "name": "Finance Notification",
+      "step_type": "notification",
+      "step_order": 2,
+      "metadata": {
+        "email": "finance@company.com",
+        "channel": "email",
+        "template": "Expense of ${{amount}} from {{department}} department requires finance review."
+      }
+    },
+    {
+      "name": "CEO Approval",
+      "step_type": "approval",
+      "step_order": 3,
+      "metadata": {
+        "assignee_email": "ceo@company.com",
+        "description": "CEO final approval for high-value expenses"
+      }
+    },
+    {
+      "name": "Task Completion",
+      "step_type": "task",
+      "step_order": 4,
+      "metadata": {
+        "action": "mark_expense_approved",
+        "description": "Expense has been fully approved and processed"
+      }
+    }
+  ],
+
+  "rules": {
+    "Manager Approval": [
+      {
+        "priority": 1,
+        "condition_expr": "amount > 100 && country == 'US' && priority == 'High'",
+        "next_step": "Finance Notification"
+      },
+      {
+        "priority": 2,
+        "condition_expr": "amount <= 100 || department == 'HR'",
+        "next_step": "CEO Approval"
+      },
+      {
+        "priority": 3,
+        "condition_expr": "priority == 'Low' && country != 'US'",
+        "next_step": "Task Completion"
+      },
+      {
+        "priority": 4,
+        "condition_expr": "DEFAULT",
+        "next_step": "Task Completion"
+      }
+    ],
+    "Finance Notification": [
+      {
+        "priority": 1,
+        "condition_expr": "DEFAULT",
+        "next_step": "CEO Approval"
+      }
+    ],
+    "CEO Approval": [
+      {
+        "priority": 1,
+        "condition_expr": "DEFAULT",
+        "next_step": "Task Completion"
+      }
+    ],
+    "Task Completion": []
+  },
+
+  "sample_execution": {
+    "triggered_by": "sinivasan",
+    "input_data": {
+      "amount": 250,
+      "country": "US",
+      "priority": "High",
+      "department": "Finance"
+    },
+    "expected_path": [
+      "Manager Approval (approval) → Rule: amount > 100 && country == 'US' && priority == 'High' ✅",
+      "Finance Notification (notification) → Emails finance team",
+      "CEO Approval (approval) → Awaits CEO decision",
+      "Task Completion (task) → Workflow COMPLETED ✅"
+    ]
+  }
+}

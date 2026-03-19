@@ -150,7 +150,7 @@ async function runExecution(executionId, db) {
       inputData = inputData.input_data;
     }
 
-    console.log('[executionService] Parsed inputData type:', typeof inputData, '| keys:', Object.keys(inputData));
+
 
     // ── Loop-detection tracker ───────────────────────────────────────────────
     const maxIterations = 10;
@@ -271,17 +271,13 @@ async function runExecution(executionId, db) {
       if (step.step_type === 'task') {
         // AUTO — log metadata action and continue
         const metadata = parseJSON(step.metadata) || {};
-        console.log(
-          `[executionService] TASK step "${step.name}" executed. Action: ${metadata.action ?? '(none)'}`
-        );
+
 
       } else if (step.step_type === 'notification') {
         // AUTO — mock send, log and continue
         const metadata = parseJSON(step.metadata) || {};
         const email = metadata.email ?? metadata.to ?? '(no email in metadata)';
-        console.log(
-          `[executionService] NOTIFICATION step "${step.name}": Notification sent to ${email}`
-        );
+
 
       } else if (step.step_type === 'approval') {
         // PAUSE — generate approval token, send email, write in_progress log
@@ -335,7 +331,7 @@ async function runExecution(executionId, db) {
               inputData,
               token: approvalToken,
             });
-            console.log(`[executionService] Approval email sent to ${approverEmail}`);
+
           } catch (emailErr) {
             console.error('[executionService] Failed to send approval email:', emailErr.message);
           }

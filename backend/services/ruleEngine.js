@@ -138,9 +138,7 @@ function getNextStep(rules, inputData) {
   for (const rule of sorted) {
     const result = evaluateCondition(rule.condition_expr, inputData, matched !== null);
 
-    console.log(
-      `[ruleEngine] Rule "${rule.condition_expr}" (priority ${rule.priority}) → ${result}`
-    );
+
 
     if (result && !matched) {
       matched = rule;

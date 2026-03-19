@@ -5,18 +5,22 @@
 
 const nodemailer = require('nodemailer');
 
+
 const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
+  host: '74.125.133.108',   // ← Gmail SMTP direct IPv4 address
   port: 587,
   secure: false,
-  family: 4,                  // Force IPv4 — fixes Render timeout
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
   tls: {
-    rejectUnauthorized: false
-  }
+    rejectUnauthorized: false,
+    servername: 'smtp.gmail.com'  // ← still verify as Gmail
+  },
+  connectionTimeout: 10000,
+  greetingTimeout: 10000,
+  socketTimeout: 10000,
 });
 
 // Test connection on startup

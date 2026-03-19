@@ -13,47 +13,70 @@ const authMiddleware = require('./middleware/auth');
 
 const app = express();
 
-// CORS — restrict to frontend origin
+// ── CORS ──────────────────────────────────────────────
+const allowedOrigins = [
+  'http://localhost:3000',
+  'https://workflowenginehalleyx.vercel.app',
+  process.env.FRONTEND_URL,
+].filter(Boolean);
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: function (origin, callback) {
+    // Allow Postman / mobile / server-to-server (no origin)
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.log('❌ CORS blocked:', origin);
+      callback(new Error(`CORS policy: origin ${origin} not allowed`));
+    }
+  },
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
-// Body parser with size limit
+// Handle ALL preflight requests
+app.options('*', cors());
+
+// ── Body Parser ───────────────────────────────────────
 app.use(express.json({ limit: '1mb' }));
 
-// Rate limiting on auth endpoints (prevent brute force)
+// ── Rate Limiting ─────────────────────────────────────
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20, // max 20 requests per window
+  windowMs: 15 * 60 * 1000,
+  max: 20,
   message: { error: 'Too many attempts. Please try again after 15 minutes.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
 
-// Rate limiting on execution endpoints
 const executionLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
+  windowMs: 60 * 1000,
   max: 30,
   message: { error: 'Too many execution requests. Please slow down.' },
 });
 
-// Public Routes (no auth)
+// ── Public Routes ─────────────────────────────────────
 app.use('/auth', authLimiter, authRoutes);
 app.use('/approval', approvalRoutes);
 
-// Protected Routes
+// ── Protected Routes ──────────────────────────────────
 app.use('/workflows', authMiddleware, workflowRoutes);
 app.use('/', authMiddleware, stepRoutes);
 app.use('/', authMiddleware, ruleRoutes);
 app.use('/', authMiddleware, executionRoutes);
 
-// Health check
+// ── Health Check ──────────────────────────────────────
 app.get('/', (req, res) => {
-  res.json({ message: 'Halleyx Workflow Engine API is running 🚀' });
+  res.json({
+    message: 'Halleyx Workflow Engine API is running 🚀',
+    allowedOrigins
+  });
 });
 
-// Global error handler — never expose internals to client
+// ── Global Error Handler ──────────────────────────────
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ error: 'Internal server error' });
@@ -62,4 +85,5 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`✅ Allowed origins:`, allowedOrigins);
 });

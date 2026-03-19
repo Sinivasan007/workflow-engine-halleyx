@@ -128,14 +128,14 @@ export default function WorkflowList() {
         {/* ── header ──────────────────────────────────────────────── */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h2 className="text-2xl font-bold text-white">Workflows</h2>
-            <p className="text-[#94A3B8] text-sm mt-1">Manage and execute your workflows</p>
+            <h2 className="text-2xl font-bold text-[#111827]">Workflows</h2>
+            <p className="text-[#6B7280] text-sm mt-1">Manage and execute your workflows</p>
           </div>
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.95 }}
             onClick={() => navigate('/workflows/new')}
-            className="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-xl font-medium flex items-center gap-2 transition-all duration-200 hover:shadow-[0_0_20px_rgba(99,102,241,0.4)]"
+            className="bg-violet-600 hover:bg-violet-500 text-white px-5 py-2.5 rounded-xl font-medium flex items-center gap-2 transition-all duration-200 shadow-[0_4px_12px_rgba(124,58,237,0.3)] hover:shadow-[0_8px_20px_rgba(124,58,237,0.4)]"
           >
             <Plus className="w-4 h-4" /> New Workflow
           </motion.button>
@@ -150,44 +150,44 @@ export default function WorkflowList() {
         </div>
 
         {/* ── search / filter ─────────────────────────────────────── */}
-        <div className="bg-[#141428] border border-[#2D2D5E] rounded-2xl p-4 mb-6 flex flex-col sm:flex-row items-center gap-4">
+        <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-2xl p-4 mb-6 flex flex-col sm:flex-row items-center gap-4 shadow-[0_4px_24px_rgba(0,0,0,0.06)]">
           <div className="relative flex-1 w-full">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#64748B]" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9CA3AF]" />
             <input
               type="text"
               placeholder="Search workflows..."
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-              className="w-full bg-[#0A0A14] border border-[#2D2D5E] text-white rounded-xl pl-10 pr-4 py-2.5 text-sm placeholder-[#64748B] focus:outline-none focus:border-indigo-500 focus:shadow-[0_0_0_3px_rgba(99,102,241,0.1)] transition-all duration-200"
+              className="w-full bg-[#F8F7FF] border border-[#E5E7EB] text-[#111827] rounded-xl pl-10 pr-4 py-2.5 text-sm placeholder-[#9CA3AF] focus:outline-none focus:border-violet-400 focus:shadow-[0_0_0_3px_rgba(124,58,237,0.08)] transition-all duration-200"
             />
           </div>
           <select
             value={statusFilter}
             onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-            className="bg-[#0A0A14] border border-[#2D2D5E] text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500 min-w-[140px] transition-all duration-200"
+            className="bg-[#F8F7FF] border border-[#E5E7EB] text-[#111827] rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-violet-400 focus:shadow-[0_0_0_3px_rgba(124,58,237,0.08)] min-w-[140px] transition-all duration-200"
           >
             <option value="">All Statuses</option>
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
           </select>
-          <span className="text-xs text-[#64748B] whitespace-nowrap">
+          <span className="text-xs text-[#6B7280] whitespace-nowrap">
             Showing {workflows.length} of {totalCount} workflows
           </span>
         </div>
 
         {/* ── table ───────────────────────────────────────────────── */}
-        <div className="bg-[#141428] border border-[#2D2D5E] rounded-2xl overflow-hidden">
+        <div className="bg-[#FFFFFF] border border-[#E5E7EB] rounded-2xl overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.06)]">
           <div className="overflow-x-auto w-full">
             <table className="w-full min-w-[900px]">
               <thead>
-                <tr className="bg-[#0A0A14] border-b border-[#2D2D5E]">
-                  <th className="px-6 py-4 text-left text-[#64748B] text-xs uppercase tracking-wider font-medium">ID</th>
-                  <th className="px-6 py-4 text-left text-[#64748B] text-xs uppercase tracking-wider font-medium">Name</th>
-                  <th className="px-6 py-4 text-center text-[#64748B] text-xs uppercase tracking-wider font-medium">Steps</th>
-                  <th className="px-6 py-4 text-center text-[#64748B] text-xs uppercase tracking-wider font-medium">Version</th>
-                  <th className="px-6 py-4 text-center text-[#64748B] text-xs uppercase tracking-wider font-medium">Status</th>
-                  <th className="px-6 py-4 text-left text-[#64748B] text-xs uppercase tracking-wider font-medium">Created</th>
-                  <th className="px-6 py-4 text-right text-[#64748B] text-xs uppercase tracking-wider font-medium">Actions</th>
+                <tr className="bg-[#F8F7FF] border-b border-[#E5E7EB]">
+                  <th className="px-6 py-4 text-left text-[#6B7280] text-xs uppercase tracking-wider font-bold">ID</th>
+                  <th className="px-6 py-4 text-left text-[#6B7280] text-xs uppercase tracking-wider font-bold">Name</th>
+                  <th className="px-6 py-4 text-center text-[#6B7280] text-xs uppercase tracking-wider font-bold">Steps</th>
+                  <th className="px-6 py-4 text-center text-[#6B7280] text-xs uppercase tracking-wider font-bold">Version</th>
+                  <th className="px-6 py-4 text-center text-[#6B7280] text-xs uppercase tracking-wider font-bold">Status</th>
+                  <th className="px-6 py-4 text-left text-[#6B7280] text-xs uppercase tracking-wider font-bold">Created</th>
+                  <th className="px-6 py-4 text-right text-[#6B7280] text-xs uppercase tracking-wider font-bold">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -198,14 +198,14 @@ export default function WorkflowList() {
                     <tr>
                       <td colSpan={7}>
                         <div className="flex flex-col items-center justify-center py-20">
-                          <GitBranch className="w-16 h-16 mb-4 text-[#2D2D5E]" />
-                          <p className="font-semibold text-white text-lg">No workflows found</p>
-                          <p className="text-[#94A3B8] text-sm mt-1">Create your first workflow to get started</p>
+                          <GitBranch className="w-16 h-16 mb-4 text-[#E5E7EB]" />
+                          <p className="font-semibold text-[#111827] text-lg">No workflows found</p>
+                          <p className="text-[#6B7280] text-sm mt-1">Create your first workflow to get started</p>
                           <motion.button
                             whileHover={{ scale: 1.02 }}
                             whileTap={{ scale: 0.95 }}
                             onClick={() => navigate('/workflows/new')}
-                            className="mt-5 border border-indigo-500/50 text-indigo-400 hover:bg-indigo-500/10 px-5 py-2.5 rounded-xl text-sm font-medium flex items-center gap-2 transition-all"
+                            className="mt-5 border border-violet-200 text-violet-600 hover:bg-violet-50 px-5 py-2.5 rounded-xl text-sm font-medium flex items-center gap-2 transition-all"
                           >
                             <Plus className="w-4 h-4" /> Create Workflow
                           </motion.button>
@@ -219,20 +219,20 @@ export default function WorkflowList() {
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: index * 0.05 }}
-                      className="border-b border-[#1A1A35] hover:bg-[#1A1A35] transition-colors group"
+                      className="border-b border-[#E5E7EB] hover:bg-[#F3F0FF] transition-colors group"
                     >
                       {/* ID */}
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
-                          <span className="font-mono text-xs text-[#64748B]">{trunc(wf.id)}</span>
+                          <span className="font-mono text-xs text-[#6B7280]">{trunc(wf.id)}</span>
                           <button
                             onClick={() => handleCopy(wf.id)}
-                            className="opacity-0 group-hover:opacity-100 p-1 rounded-md hover:bg-[#2D2D5E] transition-all"
+                            className="opacity-0 group-hover:opacity-100 p-1 rounded-md hover:bg-[#E5E7EB] transition-all"
                             title="Copy full ID"
                           >
                             {copiedId === wf.id
-                              ? <Check className="w-3 h-3 text-green-400" />
-                              : <Copy className="w-3 h-3 text-[#64748B]" />
+                              ? <Check className="w-3 h-3 text-emerald-600" />
+                              : <Copy className="w-3 h-3 text-[#6B7280]" />
                             }
                           </button>
                         </div>
@@ -241,7 +241,7 @@ export default function WorkflowList() {
                       {/* Name */}
                       <td className="px-6 py-4">
                         <span
-                          className="text-white font-semibold hover:text-indigo-400 cursor-pointer transition"
+                          className="text-[#111827] font-semibold hover:text-violet-600 cursor-pointer transition"
                           onClick={() => navigate(`/workflows/${wf.id}/edit`)}
                         >
                           {wf.name}
@@ -250,13 +250,13 @@ export default function WorkflowList() {
 
                       {/* Steps */}
                       <td className="px-6 py-4 text-center">
-                        <span className="inline-flex items-center justify-center bg-[#1A1A35] border border-[#2D2D5E] text-[#94A3B8] text-xs rounded-full px-2.5 py-0.5 font-medium">
+                        <span className="inline-flex items-center justify-center bg-[#F3F0FF] border border-[#E5E7EB] text-[#6B7280] text-xs rounded-full px-2.5 py-0.5 font-medium">
                           {wf.step_count || 0}
                         </span>
                       </td>
 
                       {/* Version */}
-                      <td className="px-6 py-4 text-center text-sm text-[#64748B]">
+                      <td className="px-6 py-4 text-center text-sm text-[#6B7280]">
                         v{wf.version || 1}
                       </td>
 
@@ -266,30 +266,30 @@ export default function WorkflowList() {
                       </td>
 
                       {/* Created */}
-                      <td className="px-6 py-4 text-sm text-[#64748B] whitespace-nowrap">
+                      <td className="px-6 py-4 text-sm text-[#6B7280] whitespace-nowrap">
                         {fmt(wf.created_at)}
                       </td>
 
                       {/* Actions */}
                       <td className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end gap-1">
+                        <div className="flex items-center justify-end gap-2 text-[#9CA3AF]">
                           <button
                             onClick={() => navigate(`/workflows/${wf.id}/edit`)}
-                            className="p-1.5 rounded-lg text-[#64748B] hover:text-indigo-400 hover:bg-indigo-500/10 transition-all"
+                            className="p-2 rounded-lg hover:text-violet-600 hover:bg-violet-50 transition-all duration-200"
                             title="Edit Workflow"
                           >
                             <Pencil className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => navigate(`/workflows/${wf.id}/execute`)}
-                            className="p-1.5 rounded-lg text-[#64748B] hover:text-green-400 hover:bg-green-500/10 transition-all"
+                            className="p-2 rounded-lg hover:text-emerald-600 hover:bg-emerald-50 transition-all duration-200"
                             title="Execute Workflow"
                           >
                             <Play className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => setDeleteTarget(wf)}
-                            className="p-1.5 rounded-lg text-[#64748B] hover:text-red-400 hover:bg-red-500/10 transition-all"
+                            className="p-2 rounded-lg hover:text-red-600 hover:bg-red-50 transition-all duration-200"
                             title="Delete Workflow"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -304,15 +304,15 @@ export default function WorkflowList() {
 
           {/* ── pagination ─────────────────────────────────────────── */}
           {totalPages > 1 && (
-            <div className="bg-[#0A0A14] border-t border-[#2D2D5E] px-6 py-4 flex items-center justify-between">
-              <span className="text-sm text-[#64748B]">
+            <div className="bg-[#F8F7FF] border-t border-[#E5E7EB] px-6 py-4 flex items-center justify-between">
+              <span className="text-sm text-[#6B7280]">
                 Showing {(page - 1) * 10 + 1}-{Math.min(page * 10, totalCount)} of {totalCount} workflows
               </span>
               <div className="flex items-center gap-1">
                 <button
                   disabled={page <= 1}
                   onClick={() => setPage((p) => p - 1)}
-                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm text-[#94A3B8] hover:text-white hover:bg-[#1A1A35] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm text-[#6B7280] hover:text-[#111827] hover:bg-[#FFFFFF] hover:shadow-sm disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                 >
                   <ChevronLeft className="w-4 h-4" /> Previous
                 </button>
@@ -322,8 +322,8 @@ export default function WorkflowList() {
                     onClick={() => setPage(n)}
                     className={`w-8 h-8 rounded-lg text-sm font-medium transition-all ${
                       n === page
-                        ? 'bg-indigo-600 text-white shadow-[0_0_10px_rgba(99,102,241,0.3)]'
-                        : 'text-[#94A3B8] hover:bg-[#1A1A35] hover:text-white'
+                        ? 'bg-violet-600 text-white shadow-[0_4px_12px_rgba(124,58,237,0.3)]'
+                        : 'text-[#6B7280] hover:bg-[#FFFFFF] hover:text-[#111827] hover:shadow-sm'
                     }`}
                   >
                     {n}
@@ -332,7 +332,7 @@ export default function WorkflowList() {
                 <button
                   disabled={page >= totalPages}
                   onClick={() => setPage((p) => p + 1)}
-                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm text-[#94A3B8] hover:text-white hover:bg-[#1A1A35] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm text-[#6B7280] hover:text-[#111827] hover:bg-[#FFFFFF] hover:shadow-sm disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                 >
                   Next <ChevronRight className="w-4 h-4" />
                 </button>
@@ -351,16 +351,7 @@ export default function WorkflowList() {
           loading={deleting}
         />
 
-        {/* ── floating action button ──────────────────────────────── */}
-        <motion.button
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.9 }}
-          onClick={() => navigate('/workflows/new')}
-          className="fixed bottom-8 right-8 w-14 h-14 bg-indigo-600 rounded-full shadow-[0_0_30px_rgba(99,102,241,0.4)] hover:bg-indigo-500 flex items-center justify-center transition-all z-30"
-          title="New Workflow"
-        >
-          <Plus className="w-6 h-6 text-white" />
-        </motion.button>
+
       </motion.div>
     </Layout>
   );

@@ -7,8 +7,8 @@ const addStep = async (req, res) => {
     const { workflow_id } = req.params;
     const { name, step_type, step_order, metadata } = req.body;
 
-    // Verify workflow exists
-    const [workflow] = await pool.execute('SELECT id FROM workflows WHERE id = ?', [workflow_id]);
+    // Verify workflow exists AND belongs to this user
+    const [workflow] = await pool.execute('SELECT id FROM workflows WHERE id = ? AND user_id = ?', [workflow_id, req.user.id]);
     if (workflow.length === 0) return res.status(404).json({ error: 'Workflow not found' });
 
     if (!name || !step_type) return res.status(400).json({ error: 'name and step_type are required' });
@@ -39,7 +39,8 @@ const addStep = async (req, res) => {
     const [rows] = await pool.execute('SELECT * FROM steps WHERE id = ?', [id]);
     res.status(201).json(rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('addStep error:', err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -48,7 +49,8 @@ const getStepsByWorkflow = async (req, res) => {
   try {
     const { workflow_id } = req.params;
 
-    const [workflow] = await pool.execute('SELECT id FROM workflows WHERE id = ?', [workflow_id]);
+    // Verify workflow belongs to this user
+    const [workflow] = await pool.execute('SELECT id FROM workflows WHERE id = ? AND user_id = ?', [workflow_id, req.user.id]);
     if (workflow.length === 0) return res.status(404).json({ error: 'Workflow not found' });
 
     const [steps] = await pool.execute(
@@ -57,7 +59,8 @@ const getStepsByWorkflow = async (req, res) => {
     );
     res.json(steps);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('getStepsByWorkflow error:', err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -67,7 +70,13 @@ const updateStep = async (req, res) => {
     const { id } = req.params;
     const { name, step_type, step_order, metadata } = req.body;
 
-    const [existing] = await pool.execute('SELECT * FROM steps WHERE id = ?', [id]);
+    // Verify step exists AND belongs to user's workflow
+    const [existing] = await pool.execute(
+      `SELECT s.* FROM steps s
+       JOIN workflows w ON w.id = s.workflow_id
+       WHERE s.id = ? AND w.user_id = ?`,
+      [id, req.user.id]
+    );
     if (existing.length === 0) return res.status(404).json({ error: 'Step not found' });
 
     if (step_type) {
@@ -93,7 +102,8 @@ const updateStep = async (req, res) => {
     const [updated] = await pool.execute('SELECT * FROM steps WHERE id = ?', [id]);
     res.json(updated[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('updateStep error:', err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -102,14 +112,22 @@ const deleteStep = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const [existing] = await pool.execute('SELECT * FROM steps WHERE id = ?', [id]);
+    // Verify step belongs to user's workflow
+    const [existing] = await pool.execute(
+      `SELECT s.id FROM steps s
+       JOIN workflows w ON w.id = s.workflow_id
+       WHERE s.id = ? AND w.user_id = ?`,
+      [id, req.user.id]
+    );
     if (existing.length === 0) return res.status(404).json({ error: 'Step not found' });
 
     await pool.execute('DELETE FROM steps WHERE id = ?', [id]);
     res.json({ message: 'Step deleted successfully' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('deleteStep error:', err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
 module.exports = { addStep, getStepsByWorkflow, updateStep, deleteStep };
+

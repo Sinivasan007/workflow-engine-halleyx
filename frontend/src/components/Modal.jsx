@@ -50,17 +50,17 @@ export default function Modal({ isOpen, onClose, title, children, size = 'md' })
             transition={{ duration: 0.2 }}
             className={`
               relative w-full ${widthClass} mx-4
-              bg-[#141428] border border-[#2D2D5E] rounded-2xl
-              shadow-[0_4px_24px_rgba(0,0,0,0.4)]
+              bg-[#FFFFFF] border border-[#E5E7EB] rounded-2xl
+              shadow-[0_25px_50px_rgba(0,0,0,0.15)]
               max-h-[90vh] flex flex-col
             `}
           >
             {/* header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-[#2D2D5E]">
-              <h2 className="text-lg font-semibold text-white">{title}</h2>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[#E5E7EB]">
+              <h2 className="text-lg font-semibold text-[#111827]">{title}</h2>
               <button
                 onClick={onClose}
-                className="p-1 rounded-lg text-[#64748B] hover:text-white hover:bg-[#1A1A35] transition"
+                className="p-1 rounded-lg text-[#6B7280] hover:text-[#111827] hover:bg-[#F3F4F6] transition"
               >
                 <X className="w-5 h-5" />
               </button>

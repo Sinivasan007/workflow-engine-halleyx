@@ -284,26 +284,62 @@ async function runExecution(executionId, db) {
         );
 
       } else if (step.step_type === 'approval') {
-        // PAUSE — write in_progress log, update execution, and return
+        // PAUSE — generate approval token, send email, write in_progress log
         stepStatus = 'in_progress';
+        const approvalToken = uuidv4();
+        const tokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
-        await writeLog(db, {
+        const logId = await writeLog(db, {
           execution_id:       executionId,
           step_id:            step.id,
           step_name:          step.name,
           step_type:          step.step_type,
           evaluated_rules:    evaluatedRules,
           selected_next_step: nextStepName,
-          status:             'in_progress',  // ✅ paused & waiting for approval
+          status:             'in_progress',
           started_at:         stepStartedAt,
-          ended_at:           null,           // closed by /approve
+          ended_at:           null,
         });
+
+        // Store approval token on the log entry
+        await db.execute(
+          `UPDATE execution_logs SET approval_token = ?, token_expires_at = ? WHERE id = ?`,
+          [approvalToken, tokenExpiresAt, logId]
+        );
 
         // Execution stays in_progress, waiting for /approve
         await db.execute(
           `UPDATE executions SET status = 'in_progress', current_step_id = ? WHERE id = ?`,
           [currentStepId, executionId]
         );
+
+        // Send approval email if approver email is configured
+        const metadata = parseJSON(step.metadata) || {};
+        const approverEmail = metadata.assignee_email || metadata.email || metadata.to;
+        if (approverEmail) {
+          try {
+            const { sendApprovalEmail } = require('./emailService');
+            // Load workflow name + triggered_by from execution
+            const [[execInfo]] = await db.execute(
+              `SELECT e.triggered_by, w.name AS workflow_name
+                 FROM executions e
+                 LEFT JOIN workflows w ON w.id = e.workflow_id
+                WHERE e.id = ?`,
+              [executionId]
+            );
+            await sendApprovalEmail({
+              to: approverEmail,
+              workflowName: execInfo?.workflow_name || 'Workflow',
+              stepName: step.name,
+              triggeredBy: execInfo?.triggered_by || 'system',
+              inputData,
+              token: approvalToken,
+            });
+            console.log(`[executionService] Approval email sent to ${approverEmail}`);
+          } catch (emailErr) {
+            console.error('[executionService] Failed to send approval email:', emailErr.message);
+          }
+        }
 
         timeline.push({ step: step.name, step_type: step.step_type, status: 'in_progress' });
 

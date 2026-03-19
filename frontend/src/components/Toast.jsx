@@ -5,23 +5,23 @@ import { X, CheckCircle, AlertCircle, AlertTriangle, Info } from 'lucide-react';
 /* ── colour / icon map ─────────────────────────────────────────────────── */
 const TOAST_CONFIG = {
   success: {
-    bg: 'bg-green-500/10 border-green-500/30',
-    icon: 'text-green-400',
+    bg: 'border-l-[4px] border-[#E5E7EB] border-l-[#059669]',
+    icon: 'text-[#059669]',
     Icon: CheckCircle,
   },
   error: {
-    bg: 'bg-red-500/10 border-red-500/30',
-    icon: 'text-red-400',
+    bg: 'border-l-[4px] border-[#E5E7EB] border-l-[#DC2626]',
+    icon: 'text-[#DC2626]',
     Icon: AlertCircle,
   },
   warning: {
-    bg: 'bg-amber-500/10 border-amber-500/30',
-    icon: 'text-amber-400',
+    bg: 'border-l-[4px] border-[#E5E7EB] border-l-[#D97706]',
+    icon: 'text-[#D97706]',
     Icon: AlertTriangle,
   },
   info: {
-    bg: 'bg-indigo-500/10 border-indigo-500/30',
-    icon: 'text-indigo-400',
+    bg: 'border-l-[4px] border-[#E5E7EB] border-l-violet-600',
+    icon: 'text-violet-600',
     Icon: Info,
   },
 };
@@ -44,17 +44,17 @@ function ToastItem({ toast, onClose }) {
       transition={{ type: 'spring', damping: 25, stiffness: 300 }}
       className={`
         flex items-start gap-3 w-80 border rounded-xl p-4
-        shadow-[0_4px_24px_rgba(0,0,0,0.4)] backdrop-blur-sm
+        shadow-[0_10px_40px_rgba(0,0,0,0.1)] bg-[#FFFFFF]
         ${cfg.bg}
       `}
     >
       <IconComp className={`w-5 h-5 mt-0.5 flex-shrink-0 ${cfg.icon}`} />
-      <p className="flex-1 text-sm font-medium text-white leading-snug">
+      <p className="flex-1 text-sm font-medium text-[#111827] leading-snug">
         {toast.message}
       </p>
       <button
         onClick={() => onClose(toast.id)}
-        className="flex-shrink-0 text-[#64748B] hover:text-white transition"
+        className="flex-shrink-0 text-[#6B7280] hover:text-[#111827] transition"
       >
         <X className="w-4 h-4" />
       </button>

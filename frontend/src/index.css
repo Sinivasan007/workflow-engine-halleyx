@@ -12,10 +12,43 @@ html {
   scroll-behavior: smooth;
 }
 
+:root {
+  --bg-primary    : #080812;
+  --bg-sidebar    : #0D0D1A;
+  --bg-card       : #FFFFFF;
+  --bg-card-hover : #F8F7FF;
+  --bg-elevated   : #F3F0FF;
+  --bg-input      : #F8F7FF;
+  --border-card   : #E5E7EB;
+  --border-dark   : #1E1E35;
+  --accent        : #7C3AED;
+  --accent-light  : #8B5CF6;
+  --accent-dark   : #6D28D9;
+  --accent-glow   : rgba(124,58,237,0.15);
+  --accent-glow2  : rgba(124,58,237,0.08);
+  --success       : #059669;
+  --success-bg    : rgba(5,150,105,0.1);
+  --success-border: rgba(5,150,105,0.3);
+  --danger        : #DC2626;
+  --danger-bg     : rgba(220,38,38,0.1);
+  --danger-border : rgba(220,38,38,0.3);
+  --warning       : #D97706;
+  --warning-bg    : rgba(217,119,6,0.1);
+  --info          : #2563EB;
+  --info-bg       : rgba(37,99,235,0.1);
+  --text-dark     : #111827;
+  --text-muted    : #6B7280;
+  --text-light    : #FFFFFF;
+  --text-sidebar  : #94A3B8;
+  --shadow-card   : 0 4px 24px rgba(0,0,0,0.08);
+  --shadow-hover  : 0 8px 32px rgba(124,58,237,0.12);
+  --shadow-glow   : 0 0 30px rgba(124,58,237,0.15);
+}
+
 body {
-  background-color: #0F0F1A;
+  background: #080812;
   font-family: 'Inter', sans-serif;
-  color: #FFFFFF;
+  color: #111827;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }

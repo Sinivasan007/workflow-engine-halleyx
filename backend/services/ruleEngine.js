@@ -100,9 +100,15 @@ function evaluateCondition(condition, inputData, alreadyMatched = false) {
     expr = expr.replace(/__STR_(\d+)__/g, (_, idx) => stringLiterals[parseInt(idx)]);
 
     // ── Safety check: block dangerous patterns ──
-    const DANGEROUS = /\b(eval|Function|require|process|global|__dirname|__filename|import|export|fetch|XMLHttpRequest|setTimeout|setInterval)\b/;
+    const DANGEROUS = /\b(eval|Function|require|process|global|__dirname|__filename|import|export|fetch|XMLHttpRequest|setTimeout|setInterval|constructor|prototype|__proto__)\b|\[[\s]*['"`]/;
     if (DANGEROUS.test(expr)) {
       console.warn('[ruleEngine] Blocked dangerous expression:', expr);
+      return false;
+    }
+
+    // Block any remaining bracket notation access
+    if (/\[.*\]/.test(expr.replace(/__STR_\d+__/g, ''))) {
+      console.warn('[ruleEngine] Blocked bracket notation access:', expr);
       return false;
     }
 

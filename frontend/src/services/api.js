@@ -2,6 +2,17 @@ import axios from 'axios';
 
 const API = axios.create({ baseURL: 'http://localhost:5000' });
 
+// Add a request interceptor to attach the token
+API.interceptors.request.use((config) => {
+  const token = localStorage.getItem('halleyx_token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+}, (error) => {
+  return Promise.reject(error);
+});
+
 // Workflows
 export const getWorkflows = (params) => API.get('/workflows', { params });
 export const getWorkflow = (id) => API.get(`/workflows/${id}`);
@@ -29,5 +40,11 @@ export const getExecution = (id) => API.get(`/executions/${id}`);
 export const approveExecution = (id, data) => API.post(`/executions/${id}/approve`, data);
 export const cancelExecution = (id) => API.post(`/executions/${id}/cancel`);
 export const retryExecution = (id) => API.post(`/executions/${id}/retry`);
+
+// Auth
+export const signup = (data) => API.post('/auth/signup', data);
+export const signin = (data) => API.post('/auth/signin', data);
+export const getMe = () => API.get('/auth/me');
+export const updateProfile = (data) => API.put('/auth/profile', data);
 
 export default API;

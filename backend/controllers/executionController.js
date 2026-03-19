@@ -25,28 +25,64 @@ function parseJSON(value) {
   try { return JSON.parse(value); } catch { return null; }
 }
 
+/**
+ * Replace {{fieldName}} and {fieldName} placeholders with actual values from data.
+ * E.g. "Hello {{employee_name}}" + { employee_name: 'John' } → "Hello John"
+ */
+function resolveTemplate(template, data) {
+  if (!template || typeof template !== 'string') return template || '';
+  if (!data || typeof data !== 'object') return template;
+  // Replace {{key}} first, then {key}
+  let resolved = template.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (match, key) => {
+    return data[key] !== undefined && data[key] !== null ? String(data[key]) : match;
+  });
+  resolved = resolved.replace(/\{\s*([\w.]+)\s*\}/g, (match, key) => {
+    return data[key] !== undefined && data[key] !== null ? String(data[key]) : match;
+  });
+  return resolved;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Helper — fetch execution + parsed logs + timeline, used by multiple endpoints
 // ─────────────────────────────────────────────────────────────────────────────
-async function fetchExecutionWithLogs(id) {
+async function fetchExecutionWithLogs(id, userId) {
   const [[execution]] = await pool.execute(
     `SELECT e.*, w.name AS workflow_name
        FROM executions e
        LEFT JOIN workflows w ON w.id = e.workflow_id
-      WHERE e.id = ?`,
-    [id]
+      WHERE e.id = ? AND e.user_id = ?`,
+    [id, userId]
   );
   if (!execution) return null;
 
   const [logs] = await pool.execute(
-    `SELECT * FROM execution_logs WHERE execution_id = ? ORDER BY started_at ASC`,
+    `SELECT el.*, s.metadata AS step_metadata
+       FROM execution_logs el
+       LEFT JOIN steps s ON s.id = el.step_id
+      WHERE el.execution_id = ?
+      ORDER BY el.started_at ASC, el.ended_at ASC`,
     [id]
   );
 
-  const parsedLogs = logs.map((log) => ({
-    ...log,
-    evaluated_rules: parseJSON(log.evaluated_rules),
-  }));
+  const inputData = parseJSON(execution.input_data) || {};
+
+  const parsedLogs = logs.map((log) => {
+    const meta = parseJSON(log.step_metadata) || {};
+    // Resolve template placeholders in notification metadata using input_data
+    if (log.step_type === 'notification' && Object.keys(meta).length > 0) {
+      const fieldsToResolve = ['template', 'message', 'body', 'content', 'to', 'email', 'recipient', 'address', 'assignee_email'];
+      for (const field of fieldsToResolve) {
+        if (meta[field] && typeof meta[field] === 'string') {
+          meta[field] = resolveTemplate(meta[field], inputData);
+        }
+      }
+    }
+    return {
+      ...log,
+      evaluated_rules: parseJSON(log.evaluated_rules),
+      metadata: meta,
+    };
+  });
 
   // Build timeline from logs
   const timeline = parsedLogs.map((log) => ({
@@ -75,10 +111,10 @@ const startExecution = async (req, res) => {
     // input_data is the actual fields object (e.g. { salary: 75000, role_level: 'Director' })
     const inputFields = input_data || {};
 
-    // Load workflow
+    // Load workflow (ensure it belongs to the user)
     const [[workflow]] = await pool.execute(
-      `SELECT * FROM workflows WHERE id = ?`,
-      [workflow_id]
+      `SELECT * FROM workflows WHERE id = ? AND user_id = ?`,
+      [workflow_id, req.user.id]
     );
     if (!workflow) return res.status(404).json({ error: 'Workflow not found' });
     if (!workflow.is_active) return res.status(400).json({ error: 'Workflow is not active' });
@@ -98,11 +134,12 @@ const startExecution = async (req, res) => {
 
     await pool.execute(
       `INSERT INTO executions
-         (id, workflow_id, workflow_version, status, input_data,
+         (id, user_id, workflow_id, workflow_version, status, input_data,
           current_step_id, retries, triggered_by, started_at)
-       VALUES (?, ?, ?, 'in_progress', ?, ?, 0, ?, ?)`,
+       VALUES (?, ?, ?, ?, 'in_progress', ?, ?, 0, ?, ?)`,
       [
         id,
+        req.user.id,
         workflow_id,
         workflow.version,
         JSON.stringify(inputFields),
@@ -119,11 +156,12 @@ const startExecution = async (req, res) => {
       return res.status(400).json({ error: result.error });
     }
 
-    const full = await fetchExecutionWithLogs(id);
+    const full = await fetchExecutionWithLogs(id, req.user.id);
     return res.status(201).json(full);
 
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('startExecution error:', err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -137,10 +175,10 @@ const approveExecution = async (req, res) => {
 
     if (!approver_id) return res.status(400).json({ error: 'approver_id is required' });
 
-    // Load execution
+    // Load execution (ensure it belongs to the user)
     const [[execution]] = await pool.execute(
-      `SELECT * FROM executions WHERE id = ?`,
-      [id]
+      `SELECT * FROM executions WHERE id = ? AND user_id = ?`,
+      [id, req.user.id]
     );
     if (!execution) return res.status(404).json({ error: 'Execution not found' });
 
@@ -174,7 +212,8 @@ const approveExecution = async (req, res) => {
       `UPDATE execution_logs
           SET status     = 'completed',
               approver_id = ?,
-              ended_at   = ?
+              ended_at   = ?,
+              approval_token = NULL
         WHERE execution_id = ?
           AND step_id      = ?
           AND status       = 'in_progress'`,
@@ -224,11 +263,12 @@ const approveExecution = async (req, res) => {
       );
     }
 
-    const full = await fetchExecutionWithLogs(id);
+    const full = await fetchExecutionWithLogs(id, req.user.id);
     return res.json(full);
 
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('approveExecution error:', err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -238,12 +278,13 @@ const approveExecution = async (req, res) => {
 const getAllExecutions = async (req, res) => {
   try {
     const { status, workflow_id, search, page = 1, limit = 10 } = req.query;
-    const parsedLimit  = parseInt(limit)  || 10;
-    const parsedOffset = (parseInt(page) - 1) * parsedLimit;
+    const parsedPage   = Math.max(1, parseInt(page) || 1);
+    const parsedLimit  = Math.min(100, Math.max(1, parseInt(limit) || 10));
+    const parsedOffset = (parsedPage - 1) * parsedLimit;
 
     // Build dynamic WHERE
-    const conditions = ['1=1'];
-    const params     = [];
+    const conditions = ['e.user_id = ?'];
+    const params     = [req.user.id];
 
     if (status)      { conditions.push('e.status = ?');      params.push(status); }
     if (workflow_id) { conditions.push('e.workflow_id = ?'); params.push(workflow_id); }
@@ -270,13 +311,14 @@ const getAllExecutions = async (req, res) => {
       data: rows.map((r) => ({ ...r, input_data: parseJSON(r.input_data) })),
       pagination: {
         total,
-        page:       parseInt(page),
+        page:       parsedPage,
         limit:      parsedLimit,
         totalPages: Math.ceil(total / parsedLimit),
       },
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('getAllExecutions error:', err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -285,11 +327,12 @@ const getAllExecutions = async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 const getExecutionById = async (req, res) => {
   try {
-    const full = await fetchExecutionWithLogs(req.params.id);
+    const full = await fetchExecutionWithLogs(req.params.id, req.user.id);
     if (!full) return res.status(404).json({ error: 'Execution not found' });
     res.json(full);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('getExecutionById error:', err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -301,8 +344,8 @@ const cancelExecution = async (req, res) => {
     const { id } = req.params;
 
     const [[existing]] = await pool.execute(
-      `SELECT * FROM executions WHERE id = ?`,
-      [id]
+      `SELECT * FROM executions WHERE id = ? AND user_id = ?`,
+      [id, req.user.id]
     );
     if (!existing) return res.status(404).json({ error: 'Execution not found' });
 
@@ -314,17 +357,18 @@ const cancelExecution = async (req, res) => {
 
     const now = new Date();
     await pool.execute(
-      `UPDATE executions SET status = 'canceled', ended_at = ? WHERE id = ?`,
-      [now, id]
+      `UPDATE executions SET status = 'canceled', ended_at = ? WHERE id = ? AND user_id = ?`,
+      [now, id, req.user.id]
     );
 
     const [[updated]] = await pool.execute(
-      `SELECT * FROM executions WHERE id = ?`,
-      [id]
+      `SELECT * FROM executions WHERE id = ? AND user_id = ?`,
+      [id, req.user.id]
     );
     res.json({ message: 'Execution canceled successfully', execution: updated });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('cancelExecution error:', err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -337,8 +381,8 @@ const retryExecution = async (req, res) => {
     const { id } = req.params;
 
     const [[existing]] = await pool.execute(
-      `SELECT * FROM executions WHERE id = ?`,
-      [id]
+      `SELECT * FROM executions WHERE id = ? AND user_id = ?`,
+      [id, req.user.id]
     );
     if (!existing) return res.status(404).json({ error: 'Execution not found' });
 
@@ -354,8 +398,8 @@ const retryExecution = async (req, res) => {
           SET status  = 'in_progress',
               retries = retries + 1,
               ended_at = NULL
-        WHERE id = ?`,
-      [id]
+        WHERE id = ? AND user_id = ?`,
+      [id, req.user.id]
     );
 
     // Re-run from the current (failed) step
@@ -365,11 +409,12 @@ const retryExecution = async (req, res) => {
       return res.status(400).json({ error: result.error });
     }
 
-    const full = await fetchExecutionWithLogs(id);
+    const full = await fetchExecutionWithLogs(id, req.user.id);
     return res.json(full);
 
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('retryExecution error:', err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 

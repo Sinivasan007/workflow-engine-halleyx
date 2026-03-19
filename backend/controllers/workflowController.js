@@ -11,10 +11,11 @@ const createWorkflow = async (req, res) => {
     const now = new Date();
 
     await pool.execute(
-      `INSERT INTO workflows (id, name, description, version, is_active, input_schema, start_step_id, created_at, updated_at)
-       VALUES (?, ?, ?, 1, true, ?, ?, ?, ?)`,
+      `INSERT INTO workflows (id, user_id, name, description, version, is_active, input_schema, start_step_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, 1, true, ?, ?, ?, ?)`,
       [
         id,
+        req.user.id,
         name,
         description || null,
         input_schema ? JSON.stringify(input_schema) : null,
@@ -27,7 +28,8 @@ const createWorkflow = async (req, res) => {
     const [rows] = await pool.execute('SELECT * FROM workflows WHERE id = ?', [id]);
     res.status(201).json(rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('createWorkflow error:', err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -35,12 +37,13 @@ const createWorkflow = async (req, res) => {
 const getAllWorkflows = async (req, res) => {
   try {
     const { search = '', status, page = 1, limit = 10 } = req.query;
-    const parsedLimit  = parseInt(limit)  || 10;
-    const parsedOffset = (parseInt(page) - 1) * parsedLimit;
+    const parsedPage   = Math.max(1, parseInt(page) || 1);
+    const parsedLimit  = Math.min(100, Math.max(1, parseInt(limit) || 10));
+    const parsedOffset = (parsedPage - 1) * parsedLimit;
 
     // Build dynamic conditions
-    const conditions = ['(w.name LIKE ? OR w.description LIKE ?)'];
-    const params = [`%${search}%`, `%${search}%`];
+    const conditions = ['w.user_id = ?', '(w.name LIKE ? OR w.description LIKE ?)'];
+    const params = [req.user.id, `%${search}%`, `%${search}%`];
 
     if (status === 'active')   { conditions.push('w.is_active = 1'); }
     if (status === 'inactive') { conditions.push('w.is_active = 0'); }
@@ -67,13 +70,14 @@ const getAllWorkflows = async (req, res) => {
       data: rows,
       pagination: {
         total,
-        page: parseInt(page),
+        page: parsedPage,
         limit: parsedLimit,
         totalPages: Math.ceil(total / parsedLimit),
       },
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('getAllWorkflows error:', err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -82,30 +86,37 @@ const getWorkflowById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const [workflows] = await pool.execute('SELECT * FROM workflows WHERE id = ?', [id]);
+    const [workflows] = await pool.execute('SELECT * FROM workflows WHERE id = ? AND user_id = ?', [id, req.user.id]);
     if (workflows.length === 0) return res.status(404).json({ error: 'Workflow not found' });
 
     const workflow = workflows[0];
 
     // Fetch steps ordered by step_order
     const [steps] = await pool.execute(
-      'SELECT * FROM steps WHERE workflow_id = ? ORDER BY step_order ASC',
+      'SELECT * FROM steps WHERE workflow_id = ?', // steps are implicitly tied to workflow, which is user-filtered
       [id]
     );
 
-    // Fetch rules for each step ordered by priority
-    for (const step of steps) {
-      const [rules] = await pool.execute(
-        'SELECT * FROM rules WHERE step_id = ? ORDER BY priority ASC',
-        [step.id]
+    // Fetch all rules for all steps in one query (avoids N+1)
+    if (steps.length > 0) {
+      const stepIds = steps.map(s => s.id);
+      const placeholders = stepIds.map(() => '?').join(',');
+      const [allRules] = await pool.execute(
+        `SELECT * FROM rules WHERE step_id IN (${placeholders}) ORDER BY priority ASC`,
+        stepIds
       );
-      step.rules = rules;
+      for (const step of steps) {
+        step.rules = allRules.filter(r => r.step_id === step.id);
+      }
+    } else {
+      // No steps, nothing to do
     }
 
     workflow.steps = steps;
     res.json(workflow);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('getWorkflowById error:', err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -115,7 +126,7 @@ const updateWorkflow = async (req, res) => {
     const { id } = req.params;
     const { name, description, input_schema, start_step_id, is_active } = req.body;
 
-    const [existing] = await pool.execute('SELECT * FROM workflows WHERE id = ?', [id]);
+    const [existing] = await pool.execute('SELECT * FROM workflows WHERE id = ? AND user_id = ?', [id, req.user.id]);
     if (existing.length === 0) return res.status(404).json({ error: 'Workflow not found' });
 
     const now = new Date();
@@ -123,7 +134,7 @@ const updateWorkflow = async (req, res) => {
       `UPDATE workflows
        SET name = ?, description = ?, input_schema = ?, start_step_id = ?, is_active = ?,
            version = version + 1, updated_at = ?
-       WHERE id = ?`,
+       WHERE id = ? AND user_id = ?`,
       [
         name ?? existing[0].name,
         description ?? existing[0].description,
@@ -132,13 +143,15 @@ const updateWorkflow = async (req, res) => {
         is_active ?? existing[0].is_active,
         now,
         id,
+        req.user.id
       ]
     );
 
-    const [updated] = await pool.execute('SELECT * FROM workflows WHERE id = ?', [id]);
+    const [updated] = await pool.execute('SELECT * FROM workflows WHERE id = ? AND user_id = ?', [id, req.user.id]);
     res.json(updated[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('updateWorkflow error:', err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -147,13 +160,14 @@ const deleteWorkflow = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const [existing] = await pool.execute('SELECT * FROM workflows WHERE id = ?', [id]);
+    const [existing] = await pool.execute('SELECT * FROM workflows WHERE id = ? AND user_id = ?', [id, req.user.id]);
     if (existing.length === 0) return res.status(404).json({ error: 'Workflow not found' });
 
-    await pool.execute('DELETE FROM workflows WHERE id = ?', [id]);
+    await pool.execute('DELETE FROM workflows WHERE id = ? AND user_id = ?', [id, req.user.id]);
     res.json({ message: 'Workflow deleted successfully' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('deleteWorkflow error:', err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 

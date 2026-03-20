@@ -6,7 +6,6 @@
 ![React](https://img.shields.io/badge/React-18-blue?style=for-the-badge&logo=react)
 ![MySQL](https://img.shields.io/badge/MySQL-8.0-orange?style=for-the-badge&logo=mysql)
 ![JWT](https://img.shields.io/badge/Auth-JWT-red?style=for-the-badge)
-![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)
 ![Challenge](https://img.shields.io/badge/Halleyx-Challenge%202026-purple?style=for-the-badge)
 
 > A full-stack workflow automation platform with a dynamic rule engine,

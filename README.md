@@ -19,17 +19,7 @@
 ---
 
 ## 🎬 Demo
-
-> 📹 **Demo Video:** [Watch on YouTube/Drive](#)
-> 🔗 **Live Demo:** `http://localhost:3000` (local)
-
-| Workflow List | Workflow Editor |
-|:---:|:---:|
-| Search, filter, paginate workflows | 3-step wizard: Details → Steps → Rules |
-
-| Execution View | Audit Log |
-|:---:|:---:|
-| Real-time step progress + logs | Full execution history with search |
+> 🔗 **Live Demo:** `https://workflowenginehalleyx.vercel.app/'
 
 ---
 
@@ -592,7 +582,7 @@ Error: "Workflow has no start step"
 **Sinivasan S**
 Final Year B.E. Computer Science
 Kamaraj College of Engineering and Technology
-Anna University, Tamil Nadu
+Virudhunagar, Tamil Nadu
 
 [![GitHub](https://img.shields.io/badge/GitHub-@Sinivasan007-181717?style=flat&logo=github)](https://github.com/Sinivasan007)
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-sinivasan--s-0A66C2?style=flat&logo=linkedin)](https://linkedin.com/in/sinivasan-s)

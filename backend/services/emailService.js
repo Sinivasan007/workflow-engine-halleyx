@@ -1,8 +1,22 @@
-const { Resend } = require('resend');
+const nodemailer = require('nodemailer');
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const transporter = nodemailer.createTransport({
+  host: 'smtp-relay.brevo.com',
+  port: 587,
+  secure: false,
+  auth: {
+    user: process.env.BREVO_USER,
+    pass: process.env.BREVO_PASS,
+  },
+});
 
-console.log('✅ Resend email service initialized');
+transporter.verify((err, success) => {
+  if (err) {
+    console.error('❌ Brevo error:', err.message);
+  } else {
+    console.log('✅ Brevo email service ready');
+  }
+});
 
 async function sendApprovalEmail({
   to, workflowName, stepName,
@@ -133,20 +147,15 @@ async function sendApprovalEmail({
 </html>`;
 
   try {
-    const { data, error } = await resend.emails.send({
-      from: 'Workflow Engine <onboarding@resend.dev>',
+    const info = await transporter.sendMail({
+      from: process.env.EMAIL_FROM || '"Workflow Engine" <noreply@halleyx.com>',
       to,
       subject: `⚡ Action Required: "${stepName}" needs approval — ${workflowName}`,
       html,
     });
 
-    if (error) {
-      console.error('❌ Resend error:', error);
-      throw new Error(error.message);
-    }
-
-    console.log(`✅ Approval email sent to ${to} | ID: ${data.id}`);
-    return data;
+    console.log(`✅ Approval email sent to ${to} | MessageId: ${info.messageId}`);
+    return info;
 
   } catch (err) {
     console.error('❌ sendApprovalEmail failed:', err.message);

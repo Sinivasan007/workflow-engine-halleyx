@@ -488,32 +488,6 @@ Step 4: Task Completion (task) → Marks workflow done ✅
 > Full schema available in [`schema.sql`](schema.sql).
 
 ---
-
-## 📈 Evaluation Matrix
-
-| Criteria | Weight | Status |
-|----------|:------:|:------:|
-| Backend / APIs | 20% | ✅ Complete |
-| Rule Engine | 20% | ✅ Complete |
-| Workflow Execution | 20% | ✅ Complete |
-| Frontend / UI | 15% | ✅ Complete |
-| Demo Video | 10% | 🎬 Recorded |
-| Code Quality | 5% | ✅ Clean |
-| Documentation | 5% | ✅ This README |
-| Bonus Features | 5% | ✅ All implemented |
-
-### Bonus Features Implemented
-
-- ✅ Loop detection with configurable max iterations
-- ✅ Dynamic branching (multiple execution paths)
-- ✅ Email approval system (approve/reject via link)
-- ✅ In-app notification system with persistence
-- ✅ JWT authentication with user isolation
-- ✅ Moonlight premium theme with Framer Motion
-- ✅ Rate limiting & security hardening
-
----
-
 ## 🔧 Troubleshooting
 
 <details>

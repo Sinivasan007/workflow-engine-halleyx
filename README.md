@@ -570,25 +570,6 @@ Error: "Network Error" in browser console
 3. Check CORS config in `server.js`
 </details>
 
-### 📤 How to Upload Demo Video
-
-**Option A — YouTube (Recommended):**
-1. Go to [youtube.com](https://youtube.com)
-2. Click Upload → Select your video file
-3. Title: "Halleyx Workflow Engine - Demo 2026"
-4. Set visibility to **Unlisted** (only people with link can view)
-5. Copy the video URL
-6. Replace `YOUR_YOUTUBE_LINK` in this README
-
-**Option B — Google Drive:**
-1. Upload video to Google Drive
-2. Right click → Share → Anyone with link → Viewer
-3. Copy link and add to README
-
-**Option C — Loom:**
-1. Record directly at [loom.com](https://loom.com)
-2. Copy share link
-3. Add to README
 
 ---
 

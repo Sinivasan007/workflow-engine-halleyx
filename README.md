@@ -21,26 +21,16 @@
 
 [![Watch Demo](https://img.shields.io/badge/▶_Watch_Demo-Google_Drive-blue?style=for-the-badge&logo=googledrive)](https://drive.google.com/file/d/1-S5wl2GgkBV_QThhxrJRWpEAVwSGe-Fp/view?usp=drive_link)
 
-> **5-minute walkthrough covering:**
-> - ✅ Creating a workflow with input schema
-> - ✅ Adding steps (approval/notification/task)  
-> - ✅ Defining conditional rules
-> - ✅ Executing workflow with real data
-> - ✅ Approving an approval step live
-> - ✅ Email notification sent via Resend
-> - ✅ Execution logs with rule evaluations
-> - ✅ Audit log overview
-
 ---
 
 ## 🌐 Live Demo
 
-> 🔗 **Hosted App:** [ADD YOUR HOSTED URL HERE]
+> 🔗 **Hosted App:** https://workflowenginehalleyx.vercel.app/
 > 
 > **Test Credentials:**
 > ```
-> Email    : test@yourdomain.com
-> Password : test123
+> Email    : demo@gmail.com
+> Password : Demo@1234
 > ```
 >
 > **Note:** Email notifications in the demo only 

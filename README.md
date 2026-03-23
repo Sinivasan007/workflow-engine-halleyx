@@ -570,7 +570,6 @@ Error: "Network Error" in browser console
 3. Check CORS config in `server.js`
 </details>
 
-
 ---
 
 <details>

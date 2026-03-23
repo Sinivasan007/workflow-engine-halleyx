@@ -17,8 +17,44 @@
 
 ---
 
-## 🎬 Demo
-> 🔗 **Live Demo:** `https://workflowenginehalleyx.vercel.app/'
+## 🎬 Demo Video
+
+[![Watch Demo](https://img.shields.io/badge/▶_Watch_Demo-Google_Drive-blue?style=for-the-badge&logo=googledrive)](https://drive.google.com/file/d/1-S5wl2GgkBV_QThhxrJRWpEAVwSGe-Fp/view?usp=drive_link)
+
+> **5-minute walkthrough covering:**
+> - ✅ Creating a workflow with input schema
+> - ✅ Adding steps (approval/notification/task)  
+> - ✅ Defining conditional rules
+> - ✅ Executing workflow with real data
+> - ✅ Approving an approval step live
+> - ✅ Email notification sent via Resend
+> - ✅ Execution logs with rule evaluations
+> - ✅ Audit log overview
+
+---
+
+## 🌐 Live Demo
+
+> 🔗 **Hosted App:** [ADD YOUR HOSTED URL HERE]
+> 
+> **Test Credentials:**
+> ```
+> Email    : test@yourdomain.com
+> Password : test123
+> ```
+>
+> **Note:** Email notifications in the demo only 
+> send to verified addresses (Resend free tier).
+> Approval emails will work if the assignee_email
+> in step metadata matches a verified address.
+
+| Workflow List | Workflow Editor |
+|:---:|:---:|
+| Search, filter, paginate workflows | 3-step wizard: Details → Steps → Rules |
+
+| Execution View | Audit Log |
+|:---:|:---:|
+| Real-time step progress + logs | Full execution history with search |
 
 ---
 
@@ -99,7 +135,7 @@
 | **Backend** | Node.js + Express | REST API server |
 | **Database** | MySQL 8.0 | Relational data store |
 | **Auth** | JWT + bcryptjs | Token auth & password hashing |
-| **Email** | Nodemailer | Gmail SMTP integration |
+| **Email** | Resend API | Transactional email service |
 | **IDs** | uuid v9 | UUID generation |
 | **Security** | express-rate-limit | Brute-force protection |
 
@@ -130,7 +166,7 @@ workflow-engine-halleyx/
 │   ├── 📁 services/
 │   │   ├── ruleEngine.js           # Core rule evaluator
 │   │   ├── executionService.js     # Execution loop engine
-│   │   └── emailService.js         # Nodemailer email sender
+│   │   └── emailService.js         # Resend API email sender
 │   ├── .env.example                # Environment template
 │   ├── server.js                   # Express app entry point
 │   └── package.json
@@ -236,17 +272,24 @@ DB_PASSWORD=your_mysql_password
 DB_NAME=halleyx_workflow
 JWT_SECRET=your_very_strong_secret_key_minimum_32_characters
 
-# Gmail SMTP (enable 2FA → create App Password)
-EMAIL_USER=your.email@gmail.com
-EMAIL_PASS=your_gmail_app_password
-EMAIL_FROM=Workflow Engine <your.email@gmail.com>
-
-BACKEND_URL=http://localhost:5000
+# Resend Email Configuration
+RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxx
+EMAIL_FROM=Workflow Engine <onboarding@resend.dev>
 FRONTEND_URL=http://localhost:3000
+BACKEND_URL=http://localhost:5000
 ```
 
 > [!IMPORTANT]
-> For Gmail: Enable 2-Factor Authentication, then create an **App Password** at [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords). Use that App Password (not your regular password) in `EMAIL_PASS`.
+> **Email Setup with Resend:**
+> 1. Sign up at [resend.com](https://resend.com)
+> 2. Go to API Keys → Create API Key
+> 3. Copy the key to `RESEND_API_KEY` in `.env`
+> 4. **Important:** Resend free tier only sends 
+>    emails to **verified email addresses**.
+>    To send to any email, verify your domain 
+>    at Resend Dashboard → Domains.
+> 5. For testing: verify your own email address
+>    at Resend Dashboard → Audiences
 
 #### 4️⃣ Setup Frontend
 
@@ -527,16 +570,50 @@ Error: "Network Error" in browser console
 3. Check CORS config in `server.js`
 </details>
 
-<details>
-<summary><b>Email Not Sending</b></summary>
+### 📤 How to Upload Demo Video
 
-```
-Error: "Invalid login" or "Authentication failed"
-```
-**Fix:**
-1. Enable 2FA on your Gmail account
-2. Generate an **App Password** at [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords)
-3. Use that App Password in `EMAIL_PASS` (not your regular password)
+**Option A — YouTube (Recommended):**
+1. Go to [youtube.com](https://youtube.com)
+2. Click Upload → Select your video file
+3. Title: "Halleyx Workflow Engine - Demo 2026"
+4. Set visibility to **Unlisted** (only people with link can view)
+5. Copy the video URL
+6. Replace `YOUR_YOUTUBE_LINK` in this README
+
+**Option B — Google Drive:**
+1. Upload video to Google Drive
+2. Right click → Share → Anyone with link → Viewer
+3. Copy link and add to README
+
+**Option C — Loom:**
+1. Record directly at [loom.com](https://loom.com)
+2. Copy share link
+3. Add to README
+
+---
+
+<details>
+<summary><b>Email Only Sends to Verified Addresses</b></summary>
+
+**Resend Free Tier Limitation:**
+On the free plan, Resend only delivers emails 
+to addresses you have verified in your 
+Resend dashboard.
+
+**Fix for Testing:**
+1. Go to [resend.com/audiences](https://resend.com/audiences)
+2. Add and verify your email address
+3. Use that verified email in step metadata
+
+**Fix for Production:**
+1. Go to [resend.com/domains](https://resend.com/domains)
+2. Add and verify your domain (e.g., yourdomain.com)
+3. Update EMAIL_FROM to use your verified domain
+4. After domain verification, send to ANY email
+
+**Current behavior:**
+- Unverified email → email silently not delivered
+- Verified email → email delivered successfully ✅
 </details>
 
 <details>

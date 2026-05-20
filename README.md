@@ -322,8 +322,8 @@ Authorization: Bearer <your_jwt_token>
 
 | Method | Endpoint | Description | Auth |
 |--------|----------|-------------|:----:|
-| `POST` | `/auth/signup` | Register new user | ❌ |
-| `POST` | `/auth/signin` | Login | ❌ |
+| `POST` | `/auth/signup` | Register new user | ✅ |
+| `POST` | `/auth/signin` | Login | ✅ |
 | `GET` | `/auth/me` | Get current user | ✅ |
 | `PUT` | `/auth/profile` | Update profile | ✅ |
 
